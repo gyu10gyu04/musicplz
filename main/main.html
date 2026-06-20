@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MusicPlz — 취향을 공유하는 우리들의 플레이리스트</title>
+  <link rel="stylesheet" href="main.css">
+</head>
+<body>
+
+  <div class="progress-bar" id="progressBar"></div>
+
+  <div class="section-dots" id="sectionDots">
+    <div class="s-dot active" data-index="0"></div>
+    <div class="s-dot" data-index="1"></div>
+    <div class="s-dot" data-index="2"></div>
+    <div class="s-dot" data-index="3"></div>
+  </div>
+
+  <nav>
+    <div class="logo">Music<span class="logo-dot">Plz</span></div>
+    <div class="nav-links">
+      <a href="#" class="active" data-index="0">Home</a>
+      <a href="#" data-index="1">추천 플레이리스트</a>
+      <a href="#" data-index="3">시작하기</a>
+      <div class="nav-auth" id="navAuth">
+        <!-- JS가 로그인 상태에 따라 채워줍니다 -->
+      </div>
+    </div>
+  </nav>
+
+  <div class="noise-layer"></div>
+
+  <div class="scroll-container" id="scrollContainer">
+    <div class="scroll-track" id="scrollTrack">
+
+      <!-- ─── 섹션 1: 히어로 ─── -->
+      <section id="intro">
+        <div class="section-inner" data-depth="0.20">
+          <div class="hero-layout">
+
+            <div class="hero-left">
+              <p class="tagline">Introducing MusicPlz</p>
+              <h1>알고리즘은 모르는<br><span class="gradient-text">진짜 취향의 음악.</span></h1>
+              <p class="description">
+                AI가 기계적으로 골라주는 음악에 지쳤다면,<br>
+                지금 진짜 사람들의 감성이 담긴 플레이리스트를 발견해보세요.
+              </p>
+              <div class="btn-group">
+                <a href="#" class="cta-btn purple" data-nav="login">지금 둘러보기</a>
+                <a href="#" class="cta-ghost">어떻게 작동하나요? →</a>
+              </div>
+            </div>
+
+            <div class="hero-right">
+              <!-- 재생 중 위젯 -->
+              <div class="npw-card">
+                <div class="npw-live">
+                  <div class="npw-live-dot"></div>
+                  <span>지금 트렌딩</span>
+                </div>
+                <div class="npw-title">새벽 2시, 센치해질 때 R&amp;B</div>
+                <div class="npw-curator">by @디거킹 · 24 tracks</div>
+                <div class="waveform">
+                  <span style="height:35%;animation-delay:0s"></span>
+                  <span style="height:65%;animation-delay:.11s"></span>
+                  <span style="height:45%;animation-delay:.22s"></span>
+                  <span style="height:85%;animation-delay:.33s"></span>
+                  <span style="height:55%;animation-delay:.44s"></span>
+                  <span style="height:100%;animation-delay:.55s"></span>
+                  <span style="height:72%;animation-delay:.66s"></span>
+                  <span style="height:50%;animation-delay:.77s"></span>
+                  <span style="height:88%;animation-delay:.88s"></span>
+                  <span style="height:62%;animation-delay:.99s"></span>
+                  <span style="height:40%;animation-delay:1.1s"></span>
+                  <span style="height:78%;animation-delay:.06s"></span>
+                </div>
+                <div class="npw-track"><div class="npw-fill"></div></div>
+                <div class="npw-times"><span>1:24</span><span>3:47</span></div>
+              </div>
+
+              <!-- 인기 플레이리스트 -->
+              <div class="trending-card">
+                <div class="trending-card-title">인기 플레이리스트</div>
+                <div class="t-item">
+                  <span class="t-rank">01</span>
+                  <div class="t-info">
+                    <div class="t-name">성수동 카페 감성 LP</div>
+                    <div class="t-curator">@VinylLover</div>
+                  </div>
+                  <span class="t-likes">876♥</span>
+                </div>
+                <div class="t-item">
+                  <span class="t-rank">02</span>
+                  <div class="t-info">
+                    <div class="t-name">러닝 하이 시티팝</div>
+                    <div class="t-curator">@네오시티</div>
+                  </div>
+                  <span class="t-likes">2.4k♥</span>
+                </div>
+                <div class="t-item">
+                  <span class="t-rank">03</span>
+                  <div class="t-info">
+                    <div class="t-name">힙합 디깅 vol.7</div>
+                    <div class="t-curator">@fliphop</div>
+                  </div>
+                  <span class="t-likes">1.1k♥</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- ─── 섹션 2: 카드 스프레드 ─── -->
+      <section id="feature-main">
+        <div class="section-inner" data-depth="0.20">
+          <div class="section-header">
+            <div>
+              <p class="tagline">Human-to-Human</p>
+              <h1>사람과 사람을 잇는<br><span class="gradient-text">플레이리스트 디깅.</span></h1>
+            </div>
+            <a href="#" class="see-all">전체 보기 →</a>
+          </div>
+
+          <div class="card-container" id="cardContainer">
+
+            <div class="playlist-card">
+              <div class="card-cover cover-1">🎧</div>
+              <div class="card-body">
+                <div class="card-badge">24 TRACKS</div>
+                <div class="card-title">새벽 2시, 센치해질 때 R&amp;B</div>
+                <div class="card-user">by @디거킹</div>
+                <div class="card-footer">
+                  <span class="card-likes"><span class="heart">♥</span> 1.2k</span>
+                  <div class="card-play">
+                    <svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="playlist-card">
+              <div class="card-cover cover-2">☕️</div>
+              <div class="card-body">
+                <div class="card-badge">18 TRACKS</div>
+                <div class="card-title">성수동 카페 감성 LP</div>
+                <div class="card-user">by @VinylLover</div>
+                <div class="card-footer">
+                  <span class="card-likes"><span class="heart">♥</span> 876</span>
+                  <div class="card-play">
+                    <svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="playlist-card">
+              <div class="card-cover cover-3">🏃‍♂️</div>
+              <div class="card-body">
+                <div class="card-badge">32 TRACKS</div>
+                <div class="card-title">러닝 하이 시티팝</div>
+                <div class="card-user">by @네오시티</div>
+                <div class="card-footer">
+                  <span class="card-likes"><span class="heart">♥</span> 2.4k</span>
+                  <div class="card-play">
+                    <svg viewBox="0 0 16 16"><path d="M3 2.5l10 5.5-10 5.5V2.5z"/></svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- ─── 섹션 3: 프로필 ─── -->
+      <section id="feature-sub">
+        <div class="section-inner" data-depth="0.20">
+          <p class="tagline">Your Identity</p>
+          <h1>나만의 음악 정체성을<br><span class="gradient-text">프로필에 담다.</span></h1>
+          <p class="description">마음에 드는 큐레이터를 팔로우하고, 나만의 컬렉션을 완성하세요.</p>
+          <div class="feature-grid" id="featureGrid">
+            <div class="feature-item">
+              <div class="feat-icon">🎵</div>
+              <div class="feat-title">플레이리스트 큐레이션</div>
+              <div class="feat-desc">직접 만든 플레이리스트를 업로드하고 팬들과 공유하세요.</div>
+            </div>
+            <div class="feature-item">
+              <div class="feat-icon">👤</div>
+              <div class="feat-title">뮤직 프로필</div>
+              <div class="feat-desc">나의 장르 취향과 최애 아티스트가 담긴 나만의 페이지.</div>
+            </div>
+            <div class="feature-item">
+              <div class="feat-icon">💜</div>
+              <div class="feat-title">팔로우 & 디깅</div>
+              <div class="feat-desc">취향이 맞는 큐레이터를 팔로우해 새 음악을 발견하세요.</div>
+            </div>
+            <div class="feature-item">
+              <div class="feat-icon">🔔</div>
+              <div class="feat-title">실시간 알림</div>
+              <div class="feat-desc">팔로잉한 큐레이터가 새 플레이리스트를 올리면 바로 알림.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─── 섹션 4: CTA ─── -->
+      <section id="cta-final">
+        <div class="section-inner" data-depth="0.20">
+          <p class="tagline">Get Started Free</p>
+          <div class="cta-head">
+            당신의<br>음악을<br>
+            <span class="gradient-text">Plz.</span>
+          </div>
+          <div class="stat-row">
+            <div class="stat">
+              <div class="stat-num" id="stat0" data-target="12" data-suffix="K+">0K+</div>
+              <div class="stat-label">플레이리스트</div>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat">
+              <div class="stat-num" id="stat1" data-target="48" data-suffix="K+">0K+</div>
+              <div class="stat-label">큐레이터</div>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat">
+              <div class="stat-num" id="stat2" data-target="1" data-suffix="M+">0M+</div>
+              <div class="stat-label">트랙</div>
+            </div>
+          </div>
+          <div class="btn-group">
+            <a href="#" class="cta-btn purple" data-nav="login">무료로 시작하기</a>
+            <a href="#" class="cta-ghost" data-nav="login">이미 계정이 있어요</a>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <div class="scroll-indicator" id="scrollIndicator">두 손가락으로 스크롤 →</div>
+
+  <!-- 페이지 전환용 웨이브 오버레이 -->
+  <svg class="wave-transition" id="waveTransition" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+    <path id="wavePath" d="M0,100 L100,100 L100,100 L0,100 Z"></path>
+  </svg>
+
+  <script src="main.js"></script>
+</body>
+</html>

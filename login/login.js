@@ -1,0 +1,244 @@
+(() => {
+  /* ─── 수학 헬퍼 (main.js와 동일 로직 공유) ─── */
+  const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
+  function easeInOutCubic(t) {
+    return t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2;
+  }
+
+  /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     페이지 전환 웨이브 (main.js와 동일 사양)
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+  const waveEl   = document.getElementById('waveTransition');
+  const wavePath = document.getElementById('wavePath');
+
+  function setWave(p) {
+    const e = easeInOutCubic(p);
+    const topY    = 100 - e * 100;
+    const waveAmp = 9 * Math.sin(e * Math.PI);
+    const midY    = topY - waveAmp;
+
+    wavePath.setAttribute(
+      'd',
+      `M0,100 L0,${topY} C25,${midY} 75,${midY} 100,${topY} L100,100 Z`
+    );
+  }
+
+  function playWaveIntro() {
+    waveEl.style.pointerEvents = 'auto';
+    let start = null;
+    const DURATION = 560;
+    function step(ts) {
+      if (start === null) start = ts;
+      const p = clamp((ts - start) / DURATION, 0, 1);
+      setWave(1 - p);
+      if (p < 1) {
+        requestAnimationFrame(step);
+      } else {
+        waveEl.style.pointerEvents = 'none';
+      }
+    }
+    requestAnimationFrame(step);
+  }
+
+  function playWaveExit(toUrl) {
+    waveEl.style.pointerEvents = 'auto';
+    let start = null;
+    const DURATION = 620;
+    function step(ts) {
+      if (start === null) start = ts;
+      const p = clamp((ts - start) / DURATION, 0, 1);
+      setWave(p);
+      if (p < 1) {
+        requestAnimationFrame(step);
+      } else {
+        sessionStorage.setItem('mp-transition', '1');
+        location.href = toUrl;
+      }
+    }
+    requestAnimationFrame(step);
+  }
+
+  playWaveIntro();
+
+  const logoHome = document.getElementById('logoHome');
+  logoHome.addEventListener('click', e => {
+    e.preventDefault();
+    playWaveExit(logoHome.getAttribute('href'));
+  });
+
+  /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     로그인 ↔ 회원가입 모드 전환
+     필드 구성은 거의 동일하고(닉네임만 추가) 라벨/문구만 바뀜
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+  let mode = 'login'; // 'login' | 'signup'
+
+  const modeTagline      = document.getElementById('modeTagline');
+  const modeHeading      = document.getElementById('modeHeading');
+  const modeDescription  = document.getElementById('modeDescription');
+  const nameField        = document.getElementById('nameField');
+  const loginOnlyRow     = document.getElementById('loginOnlyRow');
+  const submitLabel      = document.getElementById('submitLabel');
+  const modeSwitchPrompt = document.getElementById('modeSwitchPrompt');
+  const displayNameInput = document.getElementById('displayName');
+
+  function applyMode() {
+    if (mode === 'login') {
+      modeTagline.textContent = 'Welcome Back';
+      modeHeading.innerHTML = '다시 만나서<br><span class="gradient-text">반가워요.</span>';
+      modeDescription.textContent = '계정에 로그인하고 나만의 플레이리스트를 이어가세요.';
+      nameField.hidden = true;
+      loginOnlyRow.hidden = false;
+      submitLabel.textContent = '로그인';
+      modeSwitchPrompt.innerHTML = '아직 계정이 없으신가요? <a href="#" id="modeSwitchLink">무료로 시작하기</a>';
+    } else {
+      modeTagline.textContent = 'Get Started';
+      modeHeading.innerHTML = '취향을 발견할<br><span class="gradient-text">시간이에요.</span>';
+      modeDescription.textContent = '이메일만으로 30초 안에 가입하고 바로 시작해보세요.';
+      nameField.hidden = false;
+      loginOnlyRow.hidden = true;
+      submitLabel.textContent = '무료로 시작하기';
+      modeSwitchPrompt.innerHTML = '이미 계정이 있으신가요? <a href="#" id="modeSwitchLink">로그인하기</a>';
+    }
+    // innerHTML로 새로 만든 링크에 이벤트 다시 연결
+    document.getElementById('modeSwitchLink').addEventListener('click', onModeSwitchClick);
+    clearServerError();
+  }
+
+  function onModeSwitchClick(e) {
+    e.preventDefault();
+    mode = mode === 'login' ? 'signup' : 'login';
+    applyMode();
+  }
+  document.getElementById('modeSwitchLink').addEventListener('click', onModeSwitchClick);
+
+  /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     비밀번호 표시 토글
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+  const pwInput   = document.getElementById('password');
+  const togglePw  = document.getElementById('togglePw');
+  const eyeIcon   = document.getElementById('eyeIcon');
+
+  const EYE_OPEN   = 'M12 5c-7 0-10 7-10 7s3 7 10 7 10-7 10-7-3-7-10-7zm0 11a4 4 0 110-8 4 4 0 010 8z';
+  const EYE_CLOSED = 'M3.27 2 2 3.27l3.06 3.06C3.45 7.85 2.3 9.6 2 10c0 0 3 7 10 7 1.9 0 3.5-.4 4.86-1.05L20.73 22 22 20.73 3.27 2zM12 15a3 3 0 01-3-3c0-.4.08-.78.22-1.13l1.5 1.5A1.5 1.5 0 0012 14a1.5 1.5 0 001.13-.5l1.5 1.5c-.35.14-.73.22-1.13.22h-1.5zm9.93-5S19 3 12 3c-.96 0-1.84.13-2.64.35l1.7 1.7c.3-.03.6-.05.94-.05 5.16 0 7.74 4.35 8.35 5.5-.2.37-.6 1.02-1.2 1.74l1.42 1.42c1.1-1.27 1.66-2.4 1.66-2.4z';
+
+  togglePw.addEventListener('click', () => {
+    const showing = pwInput.type === 'text';
+    pwInput.type = showing ? 'password' : 'text';
+    eyeIcon.querySelector('path').setAttribute('d', showing ? EYE_OPEN : EYE_CLOSED);
+    togglePw.setAttribute('aria-label', showing ? '비밀번호 표시' : '비밀번호 숨기기');
+  });
+
+  /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     클라이언트 측 유효성 검사
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+  const form          = document.getElementById('authForm');
+  const emailInput    = document.getElementById('email');
+  const emailError    = document.getElementById('emailError');
+  const passwordError = document.getElementById('passwordError');
+  const submitBtn     = document.getElementById('submitBtn');
+  const serverError   = document.getElementById('serverError');
+
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  function setFieldError(input, errorEl, msg) {
+    input.classList.toggle('has-error', !!msg);
+    errorEl.textContent = msg || '';
+  }
+
+  function clearServerError() {
+    serverError.hidden = true;
+    serverError.textContent = '';
+  }
+
+  function showServerError(msg) {
+    serverError.hidden = false;
+    serverError.textContent = msg;
+  }
+
+  function validate() {
+    let ok = true;
+
+    if (!emailInput.value.trim()) {
+      setFieldError(emailInput, emailError, '이메일을 입력해주세요.');
+      ok = false;
+    } else if (!EMAIL_RE.test(emailInput.value.trim())) {
+      setFieldError(emailInput, emailError, '올바른 이메일 형식이 아니에요.');
+      ok = false;
+    } else {
+      setFieldError(emailInput, emailError, '');
+    }
+
+    if (!pwInput.value) {
+      setFieldError(pwInput, passwordError, '비밀번호를 입력해주세요.');
+      ok = false;
+    } else if (pwInput.value.length < 8) {
+      setFieldError(pwInput, passwordError, '비밀번호는 8자 이상이어야 해요.');
+      ok = false;
+    } else {
+      setFieldError(pwInput, passwordError, '');
+    }
+
+    return ok;
+  }
+
+  [emailInput, pwInput].forEach(input => {
+    input.addEventListener('input', () => {
+      const errEl = input === emailInput ? emailError : passwordError;
+      setFieldError(input, errEl, '');
+      clearServerError();
+    });
+  });
+
+  function setLoading(isLoading, loadingText) {
+    submitBtn.classList.toggle('is-loading', isLoading);
+    submitBtn.disabled = isLoading;
+    if (isLoading) {
+      submitLabel.innerHTML = `<span class="spinner" style="display:inline-block"></span> ${loadingText}`;
+    } else {
+      submitLabel.textContent = mode === 'login' ? '로그인' : '무료로 시작하기';
+    }
+  }
+
+  /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     API 호출
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+  async function callAuthApi(path, payload) {
+    const res = await fetch(`/api/auth/${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin', // 세션 쿠키 송수신
+      body: JSON.stringify(payload),
+    });
+    let data = {};
+    try { data = await res.json(); } catch (_) { /* 빈 응답일 수 있음 */ }
+    if (!res.ok) {
+      throw new Error(data.error || '요청 처리 중 문제가 발생했어요.');
+    }
+    return data;
+  }
+
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    clearServerError();
+    if (!validate()) return;
+
+    const payload = {
+      email: emailInput.value.trim(),
+      password: pwInput.value,
+    };
+    if (mode === 'signup') {
+      payload.displayName = displayNameInput.value.trim();
+    }
+
+    setLoading(true, mode === 'login' ? '로그인 중…' : '가입 중…');
+
+    try {
+      await callAuthApi(mode === 'login' ? 'login' : 'signup', payload);
+      // 성공 시 보라색 웨이브로 전환하며 홈으로 이동
+      playWaveExit('../main/main.html');
+    } catch (err) {
+      setLoading(false);
+      showServerError(err.message);
+    }
+  });
+})();

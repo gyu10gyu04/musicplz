@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>로그인 — MusicPlz</title>
+  <link rel="stylesheet" href="login.css">
+</head>
+<body>
+
+  <div class="noise-layer"></div>
+
+  <nav>
+    <a href="../main/main.html" class="logo" id="logoHome">Music<span class="logo-dot">Plz</span></a>
+  </nav>
+
+  <main class="login-wrap">
+    <div class="login-card">
+      <p class="tagline" id="modeTagline">Welcome Back</p>
+      <h1 id="modeHeading">다시 만나서<br><span class="gradient-text">반가워요.</span></h1>
+      <p class="description" id="modeDescription">계정에 로그인하고 나만의 플레이리스트를 이어가세요.</p>
+
+      <div class="server-error" id="serverError" hidden></div>
+
+      <form id="authForm" novalidate>
+        <div class="field" id="nameField" hidden>
+          <label for="displayName">닉네임</label>
+          <input type="text" id="displayName" name="displayName" placeholder="플레이리스트에 표시될 이름" autocomplete="nickname" maxlength="40">
+        </div>
+
+        <div class="field">
+          <label for="email">이메일</label>
+          <input type="email" id="email" name="email" placeholder="you@example.com" autocomplete="email" required>
+          <span class="field-error" id="emailError"></span>
+        </div>
+
+        <div class="field">
+          <label for="password">비밀번호</label>
+          <div class="password-wrap">
+            <input type="password" id="password" name="password" placeholder="비밀번호 입력" autocomplete="current-password" required minlength="8">
+            <button type="button" class="toggle-pw" id="togglePw" aria-label="비밀번호 표시">
+              <svg viewBox="0 0 24 24" id="eyeIcon"><path d="M12 5c-7 0-10 7-10 7s3 7 10 7 10-7 10-7-3-7-10-7zm0 11a4 4 0 110-8 4 4 0 010 8z"/></svg>
+            </button>
+          </div>
+          <span class="field-error" id="passwordError"></span>
+        </div>
+
+        <div class="row-between" id="loginOnlyRow">
+          <label class="remember">
+            <input type="checkbox" id="remember">
+            <span>로그인 상태 유지</span>
+          </label>
+          <a href="#" class="forgot-link">비밀번호를 잊으셨나요?</a>
+        </div>
+
+        <button type="submit" class="cta-btn purple submit-btn" id="submitBtn">
+          <span class="btn-label" id="submitLabel">로그인</span>
+        </button>
+      </form>
+
+      <p class="signup-prompt" id="modeSwitchPrompt">아직 계정이 없으신가요? <a href="#" id="modeSwitchLink">무료로 시작하기</a></p>
+    </div>
+  </main>
+
+  <!-- 페이지 전환용 웨이브 오버레이 (홈에서 들어올 때는 덮인 상태로 시작 → 가라앉으며 등장) -->
+  <svg class="wave-transition" id="waveTransition" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+    <path id="wavePath" d="M0,100 L0,0 C25,0 75,0 100,0 L100,100 Z"></path>
+  </svg>
+
+  <script src="login.js"></script>
+</body>
+</html>
