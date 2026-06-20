@@ -20,16 +20,6 @@ body{
   mix-blend-mode:multiply;
 }
 
-/* ── 상단 진행 바 ── */
-.progress-bar{
-  position:fixed;top:0;left:0;
-  height:2px;width:0%;
-  background:#7c3aed;
-  z-index:2000;
-  will-change:width;
-  transform:translateZ(0);
-}
-
 /* ── 섹션 도트 ── */
 .section-dots{
   position:fixed;right:22px;top:50%;
@@ -41,7 +31,6 @@ body{
   width:5px;height:5px;border-radius:50%;
   background:rgba(0,0,0,.13);
   transition:background-color .3s,transform .3s cubic-bezier(.34,1.56,.64,1);
-  cursor:pointer;
 }
 .s-dot.active{background:#0a0a0a;transform:scale(1.9);}
 
@@ -74,6 +63,10 @@ nav .logo,nav .nav-links{pointer-events:auto;}
   margin-left:30px;
   pointer-events:auto;
 }
+/* .nav-links a 가 margin-left:30px를 이미 깔아주는데, 로그아웃 상태의
+   "시작하기" 링크는 .nav-links a에도 해당되어 margin-left가 두 번(30+30px)
+   겹쳐 붙어 따로 떨어져 보였음 → 안쪽 a의 margin은 0으로 리셋 */
+#navAuth a{margin-left:0;}
 .nav-auth .nav-login-link{
   font-size:.86rem;font-weight:600;color:#7c3aed;
   text-decoration:none;
@@ -134,6 +127,21 @@ nav .logo,nav .nav-links{pointer-events:auto;}
 .nav-dropdown-item--danger{color:#e23a4e;}
 .nav-dropdown-item--danger:hover{background:rgba(226,58,78,.07);color:#c4233a;}
 .nav-dropdown-divider{height:1px;background:#f0f0f0;margin:5px 2px;}
+
+/* 드롭다운(프로필/설정)은 <a> 태그라서 .nav-links a 규칙(margin-left:30px,
+   옅은 회색 color, hover 시 검정색 등)이 같이 적용되어 박스가 오른쪽으로
+   밀려 패널 밖으로 삐져나와 보였음(로그아웃은 <button>이라 영향 없었음).
+   #navAuth는 id 선택자라 .nav-links a보다 우선순위가 높으므로 여기서 확실히 리셋. */
+#navAuth .nav-dropdown-item{
+  margin-left:0;
+  color:#1a1a1a;
+  font-size:.86rem;
+  font-weight:500;
+  transition:.12s;
+}
+#navAuth .nav-dropdown-item:hover{background:rgba(124,58,237,.07);color:#7c3aed;}
+#navAuth .nav-dropdown-item--danger{color:#e23a4e;}
+#navAuth .nav-dropdown-item--danger:hover{background:rgba(226,58,78,.07);color:#c4233a;}
 
 /* ── 스크롤 엔진 ── */
 .scroll-container{

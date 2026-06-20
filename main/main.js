@@ -4,7 +4,6 @@
   const track       = document.getElementById('scrollTrack');
   const sections    = Array.from(track.children);
   const navLinks    = document.querySelectorAll('.nav-links a');
-  const progressBar = document.getElementById('progressBar');
   const dots         = document.querySelectorAll('.s-dot');
   const scrollInd   = document.getElementById('scrollIndicator');
 
@@ -183,9 +182,6 @@
   function render() {
     track.style.transform = `translate3d(${(-current).toFixed(2)}px, 0, 0)`;
 
-    const progress = maxScroll > 0 ? current / maxScroll : 0;
-    progressBar.style.width = (progress * 100) + '%';
-
     sectionInners.forEach(({ inner, depth }, i) => {
       if (!inner) return;
       const sp    = clamp((current - i * sW) / sW, -1, 1);
@@ -293,9 +289,8 @@
   navLinks.forEach(link => {
     link.addEventListener('click', e => { e.preventDefault(); goTo(+link.dataset.index); });
   });
-  dots.forEach(dot => {
-    dot.addEventListener('click', () => goTo(+dot.dataset.index));
-  });
+  // 점(dot)은 더 이상 클릭으로 이동하지 않음 — 현재 섹션을 보여주는
+  // 표시 용도로만 사용 (updateNav()에서 active 클래스만 토글)
 
   viewport.addEventListener('wheel',      onWheel,      { passive: false });
   viewport.addEventListener('touchstart', onTouchStart, { passive: true });
