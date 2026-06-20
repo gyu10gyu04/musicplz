@@ -329,6 +329,11 @@
   const wavePath = document.getElementById('wavePath');
   const navTriggers = document.querySelectorAll('[data-nav="login"]');
 
+  /* 현재 웨이브가 화면을 덮고 있는 상태인지 추적.
+     뒤로/앞으로가기로 인한 bfcache 복원 시 이 값을 보고
+     "전환 애니메이션이 끝난 채(=덮인 채)로 멈춘" 화면을 다시 풀어준다. */
+  let waveCovered = false;
+
   function setWave(p) {
     // p: 0(화면 하단에 깔림, 안 보임) → 1(화면 전체를 덮음)
     // viewBox 0 0 100 100 기준. y값이 작아질수록 더 많이 덮음.
@@ -345,6 +350,7 @@
 
   function playWaveTransition(toUrl) {
     waveEl.style.pointerEvents = 'auto';
+    waveCovered = true;
     let start = null;
     const DURATION = 620; // ms
 
@@ -372,6 +378,7 @@
   function playWaveIntro() {
     waveEl.style.pointerEvents = 'auto';
     setWave(1);
+    waveCovered = true;
     let start = null;
     const DURATION = 520;
     function step(ts) {
@@ -382,6 +389,7 @@
         requestAnimationFrame(step);
       } else {
         waveEl.style.pointerEvents = 'none';
+        waveCovered = false;
       }
     }
     requestAnimationFrame(step);
@@ -392,7 +400,18 @@
     playWaveIntro();
   } else {
     setWave(0);
+    waveCovered = false;
   }
+
+  /* 뒤로/앞으로가기로 이 페이지가 bfcache에서 그대로 복원된 경우
+     (예: 로그인 화면으로 넘어갔다가 뒤로가기로 돌아온 경우),
+     전환 애니메이션이 화면을 덮은 채 멈춘 상태로 보일 수 있다.
+     떠날 때 덮인 상태였다면 다시 풀어주는 인트로를 재생해 복구한다. */
+  window.addEventListener('pageshow', e => {
+    if (e.persisted && waveCovered) {
+      playWaveIntro();
+    }
+  });
 
   /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
      로그인 상태 확인 → 네비게이션에 반영
@@ -407,7 +426,7 @@
   }
 
   function renderLoggedOut() {
-    navAuth.innerHTML = `<a href="#" class="nav-login-link" data-nav="login">로그인</a>`;
+    navAuth.innerHTML = `<a href="#" class="nav-login-link" data-nav="login">시작하기</a>`;
     navAuth.querySelector('[data-nav="login"]').addEventListener('click', e => {
       e.preventDefault();
       playWaveTransition('../login/login.html');

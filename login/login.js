@@ -11,6 +11,11 @@
   const waveEl   = document.getElementById('waveTransition');
   const wavePath = document.getElementById('wavePath');
 
+  /* 현재 웨이브가 화면을 덮고 있는 상태인지 추적.
+     이 페이지에 진입할 때 SVG 초기값 자체가 이미 화면 전체를
+     덮은 상태이므로 true로 시작한다(아래 playWaveIntro가 곧바로 풀어줌). */
+  let waveCovered = true;
+
   function setWave(p) {
     const e = easeInOutCubic(p);
     const topY    = 100 - e * 100;
@@ -25,6 +30,8 @@
 
   function playWaveIntro() {
     waveEl.style.pointerEvents = 'auto';
+    setWave(1);
+    waveCovered = true;
     let start = null;
     const DURATION = 560;
     function step(ts) {
@@ -35,6 +42,7 @@
         requestAnimationFrame(step);
       } else {
         waveEl.style.pointerEvents = 'none';
+        waveCovered = false;
       }
     }
     requestAnimationFrame(step);
@@ -42,6 +50,7 @@
 
   function playWaveExit(toUrl) {
     waveEl.style.pointerEvents = 'auto';
+    waveCovered = true;
     let start = null;
     const DURATION = 620;
     function step(ts) {
@@ -59,6 +68,16 @@
   }
 
   playWaveIntro();
+
+  /* 뒤로/앞으로가기로 이 페이지가 bfcache에서 그대로 복원된 경우
+     (예: 홈으로 나갔다가 다시 뒤로가기로 로그인 화면에 돌아온 경우),
+     전환 애니메이션이 화면을 덮은 채 멈춘 상태로 보일 수 있다.
+     떠날 때 덮인 상태였다면 다시 풀어주는 인트로를 재생해 복구한다. */
+  window.addEventListener('pageshow', e => {
+    if (e.persisted && waveCovered) {
+      playWaveIntro();
+    }
+  });
 
   const logoHome = document.getElementById('logoHome');
   logoHome.addEventListener('click', e => {
