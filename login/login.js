@@ -89,7 +89,8 @@
      로그인 ↔ 회원가입 모드 전환
      필드 구성은 거의 동일하고(닉네임만 추가) 라벨/문구만 바뀜
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
-  let mode = 'login'; // 'login' | 'signup'
+  // URL에 ?mode=signup 이 붙어 있으면 회원가입 모드로 바로 시작 (기본은 로그인 모드)
+  let mode = new URLSearchParams(location.search).get('mode') === 'signup' ? 'signup' : 'login'; // 'login' | 'signup'
 
   const modeTagline      = document.getElementById('modeTagline');
   const modeHeading      = document.getElementById('modeHeading');
@@ -168,6 +169,10 @@
     serverError.hidden = true;
     serverError.textContent = '';
   }
+
+  // 정적 HTML은 로그인 모드 기준으로 작성돼 있으므로,
+  // ?mode=signup으로 들어온 경우 회원가입 모드 화면으로 맞춰준다
+  applyMode();
 
   function showServerError(msg) {
     serverError.hidden = false;

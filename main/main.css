@@ -55,6 +55,7 @@ nav{
   pointer-events:none;
 }
 nav .logo,nav .nav-links{pointer-events:auto;}
+.nav-links{display:flex;align-items:center;}
 .logo{
   font-size:1.35rem;font-weight:800;
   letter-spacing:-.3px;color:#0a0a0a;

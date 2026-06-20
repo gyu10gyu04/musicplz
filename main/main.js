@@ -204,6 +204,10 @@
     if (nearest === lastNearest) return;
     lastNearest = nearest;
     navLinks.forEach(l => l.classList.toggle('active', +l.dataset.index === nearest));
+    // navAuth는 로그인 상태에 따라 내용이 동적으로 바뀌므로,
+    // 로그아웃 상태일 때 들어가는 "시작하기" 스크롤 링크도 별도로 active 동기화
+    const dynamicNavLink = navAuth.querySelector('a[data-index]');
+    if (dynamicNavLink) dynamicNavLink.classList.toggle('active', +dynamicNavLink.dataset.index === nearest);
     dots.forEach((d, i) => d.classList.toggle('active', i === nearest));
     scrollInd.style.opacity = nearest === sections.length - 1 ? '0' : '';
   }
@@ -327,7 +331,7 @@
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
   const waveEl   = document.getElementById('waveTransition');
   const wavePath = document.getElementById('wavePath');
-  const navTriggers = document.querySelectorAll('[data-nav="login"]');
+  const navTriggers = document.querySelectorAll('[data-nav="login"], [data-nav="signup"]');
 
   /* 현재 웨이브가 화면을 덮고 있는 상태인지 추적.
      뒤로/앞으로가기로 인한 bfcache 복원 시 이 값을 보고
@@ -370,7 +374,10 @@
   navTriggers.forEach(el => {
     el.addEventListener('click', e => {
       e.preventDefault();
-      playWaveTransition('../login/login.html');
+      const url = el.dataset.nav === 'signup'
+        ? '../login/login.html?mode=signup'
+        : '../login/login.html';
+      playWaveTransition(url);
     });
   });
 
@@ -426,10 +433,10 @@
   }
 
   function renderLoggedOut() {
-    navAuth.innerHTML = `<a href="#" class="nav-login-link" data-nav="login">시작하기</a>`;
-    navAuth.querySelector('[data-nav="login"]').addEventListener('click', e => {
+    navAuth.innerHTML = `<a href="#" data-index="3">시작하기</a>`;
+    navAuth.querySelector('a').addEventListener('click', e => {
       e.preventDefault();
-      playWaveTransition('../login/login.html');
+      goTo(3);
     });
   }
 
