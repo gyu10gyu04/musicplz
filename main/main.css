@@ -48,7 +48,9 @@ nav .logo,nav .nav-links{pointer-events:auto;}
 .logo{
   font-size:1.35rem;font-weight:800;
   letter-spacing:-.3px;color:#0a0a0a;
+  display:flex;align-items:center;
 }
+.logo svg{display:block;}
 .logo-dot{color:#7c3aed;}
 .nav-links a{
   color:rgba(0,0,0,.38);
