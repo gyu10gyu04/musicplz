@@ -59,10 +59,11 @@ app.use(session({
 app.use('/api/auth', authRoutes);
 
 /* ─── 정적 파일 서빙 ───
-   프로젝트 폴더 구조(main/, login/)를 그대로 서빙합니다.
-   예: /main/main.html , /login/login.html , /main/main.css 등 */
+   프로젝트 폴더 구조(main/, login/, create/)를 그대로 서빙합니다.
+   예: /main/main.html , /login/login.html , /create/create.html 등 */
 app.use('/main', express.static(path.join(__dirname, '..', 'main')));
 app.use('/login', express.static(path.join(__dirname, '..', 'login')));
+app.use('/create', express.static(path.join(__dirname, '..', 'create')));
 
 /* 루트 접속 시 홈으로 리다이렉트 */
 app.get('/', (req, res) => res.redirect('/main/main.html'));
