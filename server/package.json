@@ -1,7 +1,7 @@
 {
   "name": "musicplz-server",
   "version": "1.0.0",
-  "description": "MusicPlz 기본 로그인 시스템 (Express + PostgreSQL)",
+  "description": "MusicPlz 기본 로그인 시스템 + AI 음악 검색 (Express + PostgreSQL + Spotify + Gemini)",
   "main": "server.js",
   "type": "commonjs",
   "engines": {

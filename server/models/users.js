@@ -1,7 +1,4 @@
 // models/users.js — users 테이블에 대한 쿼리 모음
-// pg는 비동기 API이므로 모든 함수가 Promise를 반환합니다(호출하는 쪽에서 await 필요).
-// 모든 쿼리는 파라미터 바인딩($1, $2, ...)을 사용해 SQL 인젝션을 방지합니다.
-
 const { pool } = require('../db');
 
 async function createUser({ email, passwordHash, displayName }) {

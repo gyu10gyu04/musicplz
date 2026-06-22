@@ -18,6 +18,7 @@ const session = require('express-session');
 const pgSession = require('connect-pg-simple')(session);
 const { pool, initSchema } = require('./db');
 const authRoutes = require('./routes/auth');
+const musicRoutes = require('./routes/music');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -57,6 +58,7 @@ app.use(session({
 
 /* ─── API 라우트 ─── */
 app.use('/api/auth', authRoutes);
+app.use('/api/music', musicRoutes);
 
 /* ─── 정적 파일 서빙 ───
    프로젝트 폴더 구조(main/, login/, create/)를 그대로 서빙합니다.

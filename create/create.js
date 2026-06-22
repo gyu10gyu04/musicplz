@@ -77,9 +77,7 @@
   });
 
   /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-     목업 데이터셋
-     실제로는 이 자리에 Spotify 등 외부 음악 API 검색 결과가 들어올 예정.
-     지금은 UI/동작 흐름만 보여주기 위한 더미 데이터 + 키워드 매칭 시뮬레이션.
+     보조 함수 — Spotify 앨범 커버가 없는 경우의 대체(이니셜+그라디언트) 표시용
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
   const GRADIENTS = [
     'linear-gradient(135deg,#7c3aed,#a78bfa)',
@@ -93,77 +91,25 @@
   ];
 
   function initials(name) {
-    const s = name.trim();
+    const s = (name || '').trim();
     if (!s) return '?';
     if (/[가-힣]/.test(s)) return s[0];
     return s.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
   }
 
-  const TRACKS = [
-    { title: '새벽 2시, 센치해질 때', artist: '디거킹', duration: '3:47', tags: ['새벽','감성','잔잔','이별','비'] },
-    { title: '빗소리와 너', artist: '오로라', duration: '4:02', tags: ['비','잔잔','감성','새벽'] },
-    { title: '창밖엔 비가', artist: '소란시티', duration: '3:21', tags: ['비','잔잔','우울','이별'] },
-    { title: '별이 빛나는 밤에', artist: '네온로드', duration: '3:55', tags: ['별','밤','감성','새벽'] },
-    { title: '너의 별자리', artist: '문라이트', duration: '4:14', tags: ['별','사랑','밤'] },
-    { title: '이별 통보', artist: '소란시티', duration: '3:33', tags: ['이별','새벽','우울'] },
-    { title: '헤어진 다음 날', artist: '디거킹', duration: '3:48', tags: ['이별','새벽','우울','감성'] },
-    { title: '러닝 하이', artist: '네오시티', duration: '3:12', tags: ['운동','신남','에너지','러닝'] },
-    { title: '땀과 비트', artist: '펄스웍스', duration: '3:05', tags: ['운동','신남','에너지'] },
-    { title: '오늘부터 헬스', artist: '머슬비트', duration: '2:58', tags: ['운동','신남','에너지','러닝'] },
-    { title: '성수동 카페', artist: 'VinylLover', duration: '3:40', tags: ['카페','잔잔','감성'] },
-    { title: '스타라이트', artist: '문라이트', duration: '3:29', tags: ['별','밤','사랑'] },
-    { title: '힙합 디깅 vol.7', artist: 'fliphop', duration: '3:15', tags: ['힙합','신남'] },
-    { title: '비 오는 골목', artist: '오로라', duration: '4:21', tags: ['비','잔잔','새벽','감성'] },
-    { title: '운동 갈 시간', artist: '펄스웍스', duration: '3:02', tags: ['운동','에너지','신남'] },
-    { title: '별 하나 나 하나', artist: '네온로드', duration: '3:50', tags: ['별','밤','사랑','잔잔'] },
-  ].map((t, i) => ({ ...t, id: 't' + i, gradient: GRADIENTS[i % GRADIENTS.length] }));
-
-  /* 검색어 → 의미 태그로 거칠게 매핑하는 간단한 사전.
-     실제 AI 검색을 흉내내기 위한 자리이며, 실제 구현 시 이 부분이
-     임베딩 기반 의미 검색 API 호출로 대체될 예정. */
-  const KEYWORD_MAP = [
-    { match: ['비', '빗소리', '창밖', '우산'], tag: '비' },
-    { match: ['이별', '헤어', '슬픈', '슬프'], tag: '이별' },
-    { match: ['새벽', '밤', '잠'], tag: '새벽' },
-    { match: ['별', '스타'], tag: '별' },
-    { match: ['운동', '헬스', '러닝', '땀', '신나는', '에너지'], tag: '운동' },
-    { match: ['카페', '커피'], tag: '카페' },
-    { match: ['사랑', '연애'], tag: '사랑' },
-    { match: ['힙합'], tag: '힙합' },
-    { match: ['잔잔', '감성', '센치'], tag: '감성' },
-  ];
-
-  function interpretQuery(query) {
-    const q = query.trim();
-    if (!q) return { tags: [], phrase: '' };
-    const matchedTags = new Set();
-    KEYWORD_MAP.forEach(({ match, tag }) => {
-      if (match.some(k => q.includes(k))) matchedTags.add(tag);
-    });
-    return { tags: [...matchedTags], phrase: q };
+  function gradientFor(seed) {
+    // 곡 id 문자열을 간단히 해시해서 항상 같은 그라디언트가 나오도록 함
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+    return GRADIENTS[hash % GRADIENTS.length];
   }
 
-  function searchTracks(query) {
-    const { tags, phrase } = interpretQuery(query);
-    if (!phrase) return [];
-
-    const scored = TRACKS.map(track => {
-      let score = 0;
-      tags.forEach(tag => { if (track.tags.includes(tag)) score += 3; });
-      if (track.title.includes(phrase) || phrase.includes(track.title)) score += 5;
-      if (track.artist.includes(phrase)) score += 4;
-      return { track, score };
-    }).filter(r => r.score > 0);
-
-    scored.sort((a, b) => b.score - a.score);
-    return scored.map(r => r.track);
-  }
-
-  function buildInterpretationLabel(query) {
-    const { tags } = interpretQuery(query);
-    if (tags.length === 0) return `"${query}"와 비슷한 느낌의 곡을 찾고 있어요`;
-    const tagText = tags.map(t => `#${t}`).join(' ');
-    return `${tagText} 분위기의 곡으로 이해했어요`;
+  function formatDuration(ms) {
+    if (!ms) return '';
+    const totalSec = Math.round(ms / 1000);
+    const min = Math.floor(totalSec / 60);
+    const sec = totalSec % 60;
+    return `${min}:${String(sec).padStart(2, '0')}`;
   }
 
   /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -200,13 +146,19 @@
     card.dataset.id = track.id;
     if (selectedIds.has(track.id)) card.classList.add('is-selected');
 
+    // Spotify가 앨범 커버 이미지를 줬으면 그걸 쓰고, 없으면 이니셜+그라디언트로 대체
+    const coverInner = track.coverUrl
+      ? `<img src="${track.coverUrl}" alt="" loading="lazy">`
+      : initials(track.artist);
+    const coverStyle = track.coverUrl ? '' : `style="background:${gradientFor(track.id)}"`;
+
     card.innerHTML = `
-      <div class="track-cover" style="background:${track.gradient}">${initials(track.artist)}</div>
+      <div class="track-cover" ${coverStyle}>${coverInner}</div>
       <div class="track-info">
         <div class="track-title">${track.title}</div>
         <div class="track-artist">${track.artist}</div>
       </div>
-      <span class="track-meta">${track.duration}</span>
+      <span class="track-meta">${formatDuration(track.durationMs)}</span>
       <span class="track-check" aria-hidden="true">
         <svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
       </span>
@@ -215,8 +167,16 @@
     return card;
   }
 
-  function runSearch(query) {
-    if (!query.trim()) {
+  // 검색 결과로 받은 트랙들을 id로 빠르게 찾기 위한 캐시.
+  // (선택된 곡 정보를 트레이에 표시할 때, 검색 결과가 바뀌어도 이전에 담은 곡 정보를
+  //  여전히 찾을 수 있도록, 한 번 본 트랙은 계속 이 맵에 누적해서 보관한다.)
+  const knownTracks = new Map();
+
+  let currentAbortController = null;
+
+  async function runSearch(query) {
+    const trimmed = query.trim();
+    if (!trimmed) {
       showOnly('empty');
       aiChipRow.hidden = true;
       suggestRow.style.display = '';
@@ -227,26 +187,49 @@
     showOnly('loading');
     aiChipRow.hidden = true;
 
-    // 실제 AI 의미 검색 API 호출을 흉내내는 인위적 지연.
-    // (실제 연동 시 이 setTimeout 블록을 fetch 호출로 교체)
-    window.clearTimeout(runSearch._t);
-    runSearch._t = window.setTimeout(() => {
-      const results = searchTracks(query);
+    // 이전 검색이 아직 응답을 안 받았다면 취소 (사용자가 빠르게 다시 검색한 경우 대비)
+    if (currentAbortController) currentAbortController.abort();
+    currentAbortController = new AbortController();
 
-      aiInterpretation.textContent = buildInterpretationLabel(query);
+    try {
+      const res = await fetch('/api/music/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ query: trimmed }),
+        signal: currentAbortController.signal,
+      });
+
+      let data = {};
+      try { data = await res.json(); } catch (_) { /* 빈 응답일 수 있음 */ }
+
+      if (!res.ok) {
+        throw new Error(data.error || '검색 중 문제가 발생했어요.');
+      }
+
+      const tracks = Array.isArray(data.tracks) ? data.tracks : [];
+      tracks.forEach(t => knownTracks.set(t.id, t));
+
+      aiInterpretation.textContent = data.interpretation || `"${trimmed}"로 검색했어요`;
       aiChipRow.hidden = false;
 
       resultsGrid.innerHTML = '';
-      if (results.length === 0) {
+      if (tracks.length === 0) {
         resultsCount.textContent = '결과가 없어요. 다른 표현으로 찾아볼까요?';
         showOnly('results');
         return;
       }
 
-      resultsCount.textContent = `${results.length}개의 결과`;
-      results.forEach(track => resultsGrid.appendChild(renderTrackCard(track)));
+      resultsCount.textContent = `${tracks.length}개의 결과`;
+      tracks.forEach(track => resultsGrid.appendChild(renderTrackCard(track)));
       showOnly('results');
-    }, 480);
+    } catch (err) {
+      if (err.name === 'AbortError') return; // 새 검색으로 대체된 경우 — 조용히 무시
+      aiChipRow.hidden = true;
+      resultsGrid.innerHTML = '';
+      resultsCount.textContent = err.message || '검색 중 문제가 발생했어요. 잠시 후 다시 시도해주세요.';
+      showOnly('results');
+    }
   }
 
   searchInput.addEventListener('input', () => {
@@ -287,7 +270,7 @@
   const trayCreateBtn = document.getElementById('trayCreateBtn');
 
   function trackById(id) {
-    return TRACKS.find(t => t.id === id);
+    return knownTracks.get(id);
   }
 
   function toggleTrack(track) {
@@ -318,8 +301,12 @@
       if (!track) return;
       const chip = document.createElement('div');
       chip.className = 'tray-chip';
+      const coverInner = track.coverUrl
+        ? `<img src="${track.coverUrl}" alt="" loading="lazy">`
+        : initials(track.artist);
+      const coverStyle = track.coverUrl ? '' : `style="background:${gradientFor(track.id)}"`;
       chip.innerHTML = `
-        <span class="tray-chip-cover" style="background:${track.gradient}">${initials(track.artist)}</span>
+        <span class="tray-chip-cover" ${coverStyle}>${coverInner}</span>
         <span class="tray-chip-label">${track.title}</span>
       `;
       trayStrip.appendChild(chip);
