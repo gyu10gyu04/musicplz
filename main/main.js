@@ -326,7 +326,7 @@
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
   const waveEl   = document.getElementById('waveTransition');
   const wavePath = document.getElementById('wavePath');
-  const navTriggers = document.querySelectorAll('[data-nav="login"], [data-nav="signup"]');
+  const navTriggers = document.querySelectorAll('[data-nav="login"], [data-nav="signup"], [data-nav="create"]');
 
   /* 현재 웨이브가 화면을 덮고 있는 상태인지 추적.
      뒤로/앞으로가기로 인한 bfcache 복원 시 이 값을 보고
@@ -369,9 +369,14 @@
   navTriggers.forEach(el => {
     el.addEventListener('click', e => {
       e.preventDefault();
-      const url = el.dataset.nav === 'signup'
-        ? '../login/login.html?mode=signup'
-        : '../login/login.html';
+      let url;
+      if (el.dataset.nav === 'signup') {
+        url = '../login/login.html?mode=signup';
+      } else if (el.dataset.nav === 'create') {
+        url = '../create/create.html';
+      } else {
+        url = '../login/login.html';
+      }
       playWaveTransition(url);
     });
   });
