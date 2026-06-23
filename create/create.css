@@ -357,11 +357,14 @@ nav{
   box-shadow:0 24px 60px rgba(0,0,0,.22);
   transform:scale(.92) translateY(10px);
   opacity:0;
-  transition:transform .22s cubic-bezier(.34,1.56,.64,1), opacity .18s ease;
+  transition:transform .22s cubic-bezier(.34,1.56,.64,1), opacity .18s ease, max-width .32s cubic-bezier(.22,1,.36,1);
 }
 .track-modal-backdrop.is-open .track-modal{
   transform:scale(1) translateY(0);
   opacity:1;
+}
+.track-modal.is-carousel-open{
+  max-width:560px; /* 캐러셀이 펼쳐지면 모달 자체가 넓어져서 좌우 카드가 보일 공간을 만듦 */
 }
 
 .track-modal-close{
@@ -370,32 +373,86 @@ nav{
   border:none;background:rgba(0,0,0,.05);
   display:flex;align-items:center;justify-content:center;
   cursor:pointer;transition:.15s;
+  z-index:2;
 }
 .track-modal-close:hover{background:rgba(0,0,0,.1);}
 .track-modal-close svg{
   width:14px;height:14px;stroke:rgba(0,0,0,.55);stroke-width:2;stroke-linecap:round;
 }
 
-.track-modal-cover{
-  width:148px;height:148px;border-radius:18px;
-  margin:4px auto 20px;
+/* ── 커버 영역 + 좌우 아티스트 다른 앨범 캐러셀 ── */
+.track-modal-cover-row{
+  margin:4px 0 20px;
+  overflow:hidden; /* 캐러셀이 접혀있을 때 좌우 카드가 안 보이도록 */
+}
+
+.cover-carousel-track{
+  display:flex;align-items:center;justify-content:center;
+  gap:14px;
+  overflow-x:auto;
+  scroll-snap-type:x mandatory;
+  scroll-behavior:smooth;
+  padding:2px 4px; /* 그림자가 안 잘리도록 약간의 여유 */
+  -ms-overflow-style:none;
+  scrollbar-width:none;
+}
+.cover-carousel-track::-webkit-scrollbar{display:none;}
+
+/* 캐러셀이 펼쳐지지 않은 기본 상태: 가운데(현재) 커버만 보이고 가로 스크롤도 비활성화 */
+.cover-carousel-track:not(.is-expanded){
+  overflow:visible;
+}
+
+.carousel-cover-item{
+  flex:0 0 148px;width:148px;height:148px;
+  border-radius:18px;
   display:flex;align-items:center;justify-content:center;
   font-size:2.4rem;font-weight:800;color:#fff;
   overflow:hidden;
   background:#ece9f2;
   box-shadow:0 10px 28px rgba(0,0,0,.14);
+  scroll-snap-align:center;
+  cursor:pointer;
+  transition:opacity .28s ease, transform .28s ease;
+  position:relative;
 }
-.track-modal-cover img{
+.carousel-cover-item img{
   width:100%;height:100%;object-fit:cover;display:block;
 }
+
+/* 현재(중앙) 트랙의 커버는 항상 또렷하게 */
+.carousel-cover-item.is-current{
+  opacity:1;
+  cursor:default;
+}
+/* 캐러셀이 접힌 상태에선 다른 앨범 카드들을 화면 흐름에서 제거 */
+.cover-carousel-track:not(.is-expanded) .carousel-cover-item:not(.is-current){
+  display:none;
+}
+/* 펼쳐졌을 때, 양옆의 다른 앨범 커버는 흐릿하게 보여서 "더 있다"는 느낌을 줌
+   (크기는 중앙 커버와 동일하게 유지 — 투명도만으로 구분) */
+.cover-carousel-track.is-expanded .carousel-cover-item:not(.is-current){
+  opacity:.45;
+}
+.cover-carousel-track.is-expanded .carousel-cover-item:not(.is-current):hover{
+  opacity:.8;
+}
+
+.carousel-hint{
+  margin-top:10px;text-align:center;
+  font-size:.72rem;color:rgba(0,0,0,.34);
+}
+.carousel-hint[hidden]{display:none;}
 
 .track-modal-title{
   font-size:1.18rem;font-weight:800;color:#0a0a0a;
   line-height:1.35;margin-bottom:5px;
+  transition:opacity .15s ease;
 }
 .track-modal-artist{
   font-size:.92rem;color:rgba(0,0,0,.5);
   margin-bottom:20px;
+  transition:opacity .15s ease;
 }
 
 .track-modal-album-row{
@@ -409,7 +466,43 @@ nav{
 .track-modal-album-name{
   color:#0a0a0a;font-weight:600;
   max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  transition:opacity .15s ease;
 }
+
+.track-modal-hint{
+  margin-top:14px;
+  font-size:.72rem;color:rgba(0,0,0,.32);line-height:1.6;
+}
+
+/* ── 검색 결과 영역: 앨범 모드 뒤로가기 버튼 / 더보기 버튼 ── */
+.results-header{
+  display:flex;align-items:center;gap:12px;
+}
+.results-back-btn{
+  font-size:.82rem;font-weight:600;color:#7c3aed;
+  background:rgba(124,58,237,.07);border:none;border-radius:100px;
+  padding:6px 14px;cursor:pointer;transition:.15s;
+  flex-shrink:0;
+}
+.results-back-btn[hidden]{display:none;}
+.results-back-btn:hover{background:rgba(124,58,237,.13);}
+
+.results-load-more{
+  display:flex;justify-content:center;margin-top:18px;
+}
+.results-load-more[hidden]{display:none;}
+.load-more-btn{
+  display:inline-flex;align-items:center;gap:7px;
+  font-size:.86rem;font-weight:600;color:#5b21b6;
+  background:rgba(124,58,237,.07);border:1px solid rgba(124,58,237,.16);
+  border-radius:100px;padding:10px 20px;
+  cursor:pointer;transition:.15s;
+}
+.load-more-btn:hover{background:rgba(124,58,237,.13);}
+.load-more-btn svg{
+  width:15px;height:15px;stroke:#5b21b6;stroke-width:2.2;stroke-linecap:round;
+}
+.load-more-btn.is-loading{opacity:.6;pointer-events:none;}
 
 /* ── 페이지 전환 웨이브 (main.css와 동일 사양) ── */
 .wave-transition{

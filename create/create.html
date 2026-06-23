@@ -87,9 +87,16 @@
       </div>
 
       <div class="results-header" id="resultsHeader" hidden>
+        <button type="button" class="results-back-btn" id="resultsBackBtn" hidden>← 검색으로 돌아가기</button>
         <span id="resultsCount">12개의 결과</span>
       </div>
       <div class="results-grid" id="resultsGrid" hidden></div>
+      <div class="results-load-more" id="resultsLoadMore" hidden>
+        <button type="button" class="load-more-btn" id="loadMoreBtn">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          나머지 곡 더 보기
+        </button>
+      </div>
     </section>
 
   </main>
@@ -116,13 +123,22 @@
       <button type="button" class="track-modal-close" id="trackModalClose" aria-label="닫기">
         <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
       </button>
-      <div class="track-modal-cover" id="modalTrackCover"></div>
+
+      <!-- 커버 + 좌우 아티스트 다른 앨범 캐러셀 (기본은 숨김, 커버를 꾹 누르면 펼쳐짐) -->
+      <div class="track-modal-cover-row" id="modalCoverRow">
+        <div class="cover-carousel-track" id="coverCarouselTrack">
+          <!-- JS가 현재 커버 + 좌우 다른 앨범 커버들을 채워줍니다 -->
+        </div>
+        <div class="carousel-hint" id="carouselHint" hidden>← 좌우로 넘겨서 다른 앨범 보기 →</div>
+      </div>
+
       <div class="track-modal-title" id="modalTrackTitle"></div>
       <div class="track-modal-artist" id="modalTrackArtist"></div>
       <div class="track-modal-album-row">
         <span class="track-modal-album-label">앨범</span>
         <span class="track-modal-album-name" id="modalTrackAlbum"></span>
       </div>
+      <div class="track-modal-hint">커버를 누르면 이 앨범의 곡들을, 꾹 누르면 다른 앨범들을 볼 수 있어요</div>
     </div>
   </div>
 

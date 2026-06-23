@@ -127,9 +127,12 @@
   const resultsHeader = document.getElementById('resultsHeader');
   const resultsCount  = document.getElementById('resultsCount');
   const resultsGrid   = document.getElementById('resultsGrid');
+  const resultsBackBtn = document.getElementById('resultsBackBtn');
+  const resultsLoadMore = document.getElementById('resultsLoadMore');
+  const loadMoreBtn    = document.getElementById('loadMoreBtn');
 
   function showOnly(el) {
-    [emptyState, loadingState, resultsHeader, resultsGrid].forEach(e => { e.hidden = true; });
+    [emptyState, loadingState, resultsHeader, resultsGrid, resultsLoadMore].forEach(e => { e.hidden = true; });
     if (el === 'results') {
       resultsHeader.hidden = false;
       resultsGrid.hidden = false;
@@ -241,6 +244,15 @@
   //  여전히 찾을 수 있도록, 한 번 본 트랙은 계속 이 맵에 누적해서 보관한다.)
   const knownTracks = new Map();
 
+  /* 현재 결과 영역이 "검색 결과"를 보여주는 중인지, "특정 앨범의 트랙들"을 보여주는 중인지.
+     앨범 모드에서 "검색으로 돌아가기"를 눌렀을 때 직전 검색 상태를 그대로 복원하기 위해
+     마지막 검색의 결과/문구/검색어를 기억해둔다. */
+  let viewMode = 'search'; // 'search' | 'album'
+  let lastSearchSnapshot = null; // { query, interpretation, tracks }
+  let currentAlbum = null; // 앨범 모드일 때: { id, name, coverUrl, artist, artistId }
+  let currentAlbumOffset = 0;
+  let currentAlbumHasMore = false;
+
   let currentAbortController = null;
 
   async function runSearch(query) {
@@ -251,6 +263,10 @@
       suggestRow.style.display = '';
       return;
     }
+
+    viewMode = 'search';
+    currentAlbum = null;
+    resultsBackBtn.hidden = true;
 
     suggestRow.style.display = 'none';
     showOnly('loading');
@@ -279,10 +295,15 @@
       const tracks = Array.isArray(data.tracks) ? data.tracks : [];
       tracks.forEach(t => knownTracks.set(t.id, t));
 
-      aiInterpretation.textContent = data.interpretation || `"${trimmed}"로 검색했어요`;
+      const interpretationText = data.interpretation || `"${trimmed}"로 검색했어요`;
+      aiInterpretation.textContent = interpretationText;
       aiChipRow.hidden = false;
 
+      // 앨범 모드에서 "검색으로 돌아가기"를 누르면 그대로 복원할 수 있도록 스냅샷 저장
+      lastSearchSnapshot = { query: trimmed, interpretation: interpretationText, tracks };
+
       resultsGrid.innerHTML = '';
+      resultsLoadMore.hidden = true;
       if (tracks.length === 0) {
         resultsCount.textContent = '결과가 없어요. 다른 표현으로 찾아볼까요?';
         showOnly('results');
@@ -324,6 +345,107 @@
       searchClear.hidden = false;
       runSearch(q);
     });
+  });
+
+  /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     앨범 모드 — 앨범 커버를 클릭하면 그 앨범의 트랙들을 결과 영역에 표시
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+  async function loadAlbumTracks(albumId, { append = false } = {}) {
+    const offset = append ? currentAlbumOffset : 0;
+
+    if (!append) {
+      viewMode = 'album';
+      showOnly('loading');
+      aiChipRow.hidden = true;
+      suggestRow.style.display = 'none';
+      resultsBackBtn.hidden = false;
+    } else {
+      loadMoreBtn.classList.add('is-loading');
+    }
+
+    if (currentAbortController) currentAbortController.abort();
+    currentAbortController = new AbortController();
+
+    try {
+      const res = await fetch(`/api/music/album/${encodeURIComponent(albumId)}?offset=${offset}`, {
+        credentials: 'same-origin',
+        signal: currentAbortController.signal,
+      });
+
+      let data = {};
+      try { data = await res.json(); } catch (_) { /* noop */ }
+
+      if (!res.ok) {
+        throw new Error(data.error || '앨범 정보를 불러오지 못했어요.');
+      }
+
+      const tracks = Array.isArray(data.tracks) ? data.tracks : [];
+      tracks.forEach(t => knownTracks.set(t.id, t));
+
+      currentAlbum = data.album || currentAlbum;
+      currentAlbumOffset = data.nextOffset ?? offset + tracks.length;
+      currentAlbumHasMore = Boolean(data.hasMore);
+
+      if (!append) {
+        resultsGrid.innerHTML = '';
+        aiInterpretation.textContent = `${currentAlbum?.name || '앨범'} 트랙을 순서대로 보여드려요`;
+        aiChipRow.hidden = false;
+      }
+
+      tracks.forEach(track => resultsGrid.appendChild(renderTrackCard(track)));
+      resultsCount.textContent = `${currentAlbum?.name || '앨범'} · ${data.total ?? tracks.length}곡`;
+      showOnly('results'); // 주의: showOnly가 resultsLoadMore.hidden을 true로 초기화하므로, 아래 줄보다 먼저 호출해야 함
+      resultsLoadMore.hidden = !currentAlbumHasMore;
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+      if (!append) {
+        resultsGrid.innerHTML = '';
+        resultsCount.textContent = err.message || '앨범 정보를 불러오지 못했어요.';
+        showOnly('results');
+      }
+    } finally {
+      loadMoreBtn.classList.remove('is-loading');
+    }
+  }
+
+  loadMoreBtn.addEventListener('click', () => {
+    if (!currentAlbum || !currentAlbumHasMore) return;
+    loadAlbumTracks(currentAlbum.id, { append: true });
+  });
+
+  resultsBackBtn.addEventListener('click', () => {
+    if (!lastSearchSnapshot) {
+      // 직전 검색 기록이 없으면 그냥 빈 상태로
+      viewMode = 'search';
+      currentAlbum = null;
+      resultsBackBtn.hidden = true;
+      searchInput.value = '';
+      showOnly('empty');
+      aiChipRow.hidden = true;
+      suggestRow.style.display = '';
+      return;
+    }
+
+    viewMode = 'search';
+    currentAlbum = null;
+    resultsBackBtn.hidden = true;
+    resultsLoadMore.hidden = true;
+
+    searchInput.value = lastSearchSnapshot.query;
+    searchClear.hidden = false;
+    aiInterpretation.textContent = lastSearchSnapshot.interpretation;
+    aiChipRow.hidden = false;
+    suggestRow.style.display = 'none';
+
+    resultsGrid.innerHTML = '';
+    const tracks = lastSearchSnapshot.tracks;
+    if (tracks.length === 0) {
+      resultsCount.textContent = '결과가 없어요. 다른 표현으로 찾아볼까요?';
+    } else {
+      resultsCount.textContent = `${tracks.length}개의 결과`;
+      tracks.forEach(track => resultsGrid.appendChild(renderTrackCard(track)));
+    }
+    showOnly('results');
   });
 
   /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -404,45 +526,286 @@
 
   /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
      트랙 상세 모달 — 가수 이름, 앨범 커버, 앨범 이름을 보여줌
+     + 커버를 클릭하면 그 앨범의 트랙들을 검색 결과 영역에 표시
+     + 커버를 꾹 누르면 같은 가수의 다른 앨범들이 좌우로 흐릿하게 펼쳐지는 캐러셀 표시
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
   const trackModalBackdrop = document.getElementById('trackModalBackdrop');
+  const trackModal         = document.getElementById('trackModal');
   const trackModalClose    = document.getElementById('trackModalClose');
-  const modalTrackCover    = document.getElementById('modalTrackCover');
+  const coverCarouselTrack = document.getElementById('coverCarouselTrack');
+  const carouselHint       = document.getElementById('carouselHint');
   const modalTrackTitle    = document.getElementById('modalTrackTitle');
   const modalTrackArtist   = document.getElementById('modalTrackArtist');
   const modalTrackAlbum    = document.getElementById('modalTrackAlbum');
 
+  // 모달이 지금 어떤 트랙/앨범을 보여주고 있는지 추적.
+  // 캐러셀에서 다른 앨범을 고르면 이 값들이 갱신된다.
+  let modalCurrentTrack = null;       // 모달을 열게 한 원래 트랙(앨범 트랙 보기 진입점)
+  let modalCurrentArtistName = '';    // 표시용 가수 이름(원본 트랙 기준, 캐러셀 전환해도 가수는 동일)
+  let modalArtistAlbums = null;       // 캐러셀에 쓸 아티스트 앨범 목록(지연 로딩, 캐싱)
+  let modalCarouselExpanded = false;
+
+  function buildCoverCellHtml(coverUrl, labelForInitials) {
+    if (coverUrl) return `<img src="${coverUrl}" alt="" loading="lazy">`;
+    return initials(labelForInitials);
+  }
+
+  function renderModalCover(coverUrl, artistNameForFallback) {
+    // 캐러셀이 접힌 기본 상태: 현재 트랙/앨범의 커버 하나만 보여줌
+    coverCarouselTrack.innerHTML = '';
+    coverCarouselTrack.classList.remove('is-expanded');
+    modalCarouselExpanded = false;
+    carouselHint.hidden = true;
+
+    const item = document.createElement('div');
+    item.className = 'carousel-cover-item is-current';
+    item.innerHTML = buildCoverCellHtml(coverUrl, artistNameForFallback);
+    if (!coverUrl) item.style.background = gradientFor(artistNameForFallback || 'x');
+    coverCarouselTrack.appendChild(item);
+
+    attachCoverInteractions(item, { isCurrent: true });
+  }
+
+  function updateModalText({ title, artist, album }) {
+    modalTrackTitle.style.opacity = '0';
+    modalTrackArtist.style.opacity = '0';
+    modalTrackAlbum.style.opacity = '0';
+    window.setTimeout(() => {
+      modalTrackTitle.textContent = title;
+      modalTrackArtist.textContent = artist;
+      modalTrackAlbum.textContent = album || '정보 없음';
+      modalTrackTitle.style.opacity = '1';
+      modalTrackArtist.style.opacity = '1';
+      modalTrackAlbum.style.opacity = '1';
+    }, 90);
+  }
+
   function openTrackModal(track) {
+    modalCurrentTrack = track;
+    modalCurrentArtistName = track.artist;
+    modalArtistAlbums = null; // 새 트랙을 열 때마다 캐러셀 데이터는 다시 받아오도록 초기화
+
     modalTrackTitle.textContent = track.title;
     modalTrackArtist.textContent = track.artist;
     modalTrackAlbum.textContent = track.album || '정보 없음';
+    modalTrackTitle.style.opacity = '1';
+    modalTrackArtist.style.opacity = '1';
+    modalTrackAlbum.style.opacity = '1';
 
-    if (track.coverUrl) {
-      modalTrackCover.style.background = '';
-      modalTrackCover.innerHTML = `<img src="${track.coverUrl}" alt="">`;
-    } else {
-      modalTrackCover.style.background = gradientFor(track.id);
-      modalTrackCover.innerHTML = initials(track.artist);
-    }
+    renderModalCover(track.coverUrl, track.artist);
+    trackModal.classList.remove('is-carousel-open');
 
     trackModalBackdrop.hidden = false;
-    // hidden을 막 푼 직후에 곧바로 클래스를 추가해야 트랜지션(등장 애니메이션)이 재생됨
     requestAnimationFrame(() => trackModalBackdrop.classList.add('is-open'));
   }
 
   function closeTrackModal() {
     trackModalBackdrop.classList.remove('is-open');
-    // 사라지는 애니메이션이 끝난 뒤에 완전히 숨김(hidden) 처리
-    window.setTimeout(() => { trackModalBackdrop.hidden = true; }, 200);
+    trackModal.classList.remove('is-carousel-open');
+    window.setTimeout(() => {
+      trackModalBackdrop.hidden = true;
+      coverCarouselTrack.innerHTML = '';
+      coverCarouselTrack.classList.remove('is-expanded');
+      modalCarouselExpanded = false;
+    }, 200);
   }
 
   trackModalClose.addEventListener('click', closeTrackModal);
   trackModalBackdrop.addEventListener('click', e => {
-    if (e.target === trackModalBackdrop) closeTrackModal(); // 배경 클릭 시에만 닫기
+    if (e.target === trackModalBackdrop) closeTrackModal();
   });
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && !trackModalBackdrop.hidden) closeTrackModal();
   });
+
+  /* ── 캐러셀: 같은 가수의 다른 앨범들 가져오기 (최초 펼칠 때 한 번만 요청, 이후 캐싱) ── */
+  async function fetchArtistAlbumsIfNeeded() {
+    if (modalArtistAlbums) return modalArtistAlbums; // 이미 받아온 경우 재사용
+    if (!modalCurrentTrack?.artistId) return null;
+
+    try {
+      const res = await fetch(`/api/music/artist/${encodeURIComponent(modalCurrentTrack.artistId)}/albums`, {
+        credentials: 'same-origin',
+      });
+      let data = {};
+      try { data = await res.json(); } catch (_) { /* noop */ }
+      if (!res.ok) throw new Error(data.error || '다른 앨범을 불러오지 못했어요.');
+      modalArtistAlbums = Array.isArray(data.albums) ? data.albums : [];
+      return modalArtistAlbums;
+    } catch (err) {
+      modalArtistAlbums = [];
+      return modalArtistAlbums;
+    }
+  }
+
+  /* 현재 보고 있는 앨범(또는 원본 트랙의 앨범)을 캐러셀 중앙에 두고,
+     같은 가수의 다른 앨범들을 양옆에 배치한 뒤 펼침. */
+  async function expandArtistCarousel() {
+    if (modalCarouselExpanded) return;
+
+    const centerAlbumId = modalCurrentTrack.albumId;
+    const centerCoverUrl = modalCurrentTrack.coverUrl;
+    const centerAlbumName = modalCurrentTrack.album;
+
+    const albums = await fetchArtistAlbumsIfNeeded();
+    if (!albums || albums.length === 0) return; // 다른 앨범 정보가 없으면 캐러셀을 펼치지 않음
+
+    // 현재 앨범을 목록 중앙에 두고, 나머지를 좌우로 배치
+    const others = albums.filter(a => a.id !== centerAlbumId);
+    const half = Math.ceil(others.length / 2);
+    const leftSide = others.slice(0, half).reverse(); // 중앙에 가까운 게 먼저 오도록
+    const rightSide = others.slice(half);
+
+    coverCarouselTrack.innerHTML = '';
+
+    leftSide.forEach(album => {
+      const el = createCarouselAlbumItem(album);
+      coverCarouselTrack.appendChild(el);
+    });
+
+    const centerEl = document.createElement('div');
+    centerEl.className = 'carousel-cover-item is-current';
+    centerEl.dataset.albumId = centerAlbumId || '';
+    centerEl.innerHTML = buildCoverCellHtml(centerCoverUrl, modalCurrentArtistName);
+    if (!centerCoverUrl) centerEl.style.background = gradientFor(modalCurrentArtistName);
+    coverCarouselTrack.appendChild(centerEl);
+    attachCoverInteractions(centerEl, { isCurrent: true });
+
+    rightSide.forEach(album => {
+      const el = createCarouselAlbumItem(album);
+      coverCarouselTrack.appendChild(el);
+    });
+
+    coverCarouselTrack.classList.add('is-expanded');
+    modalCarouselExpanded = true;
+    trackModal.classList.add('is-carousel-open');
+    carouselHint.hidden = false;
+
+    // 펼쳐진 직후 중앙(현재) 커버가 화면 중앙에 오도록 스크롤 위치 맞춤
+    requestAnimationFrame(() => {
+      centerEl.scrollIntoView({ behavior: 'instant', inline: 'center', block: 'nearest' });
+    });
+  }
+
+  function createCarouselAlbumItem(album) {
+    const el = document.createElement('div');
+    el.className = 'carousel-cover-item';
+    el.dataset.albumId = album.id;
+    el.innerHTML = buildCoverCellHtml(album.coverUrl, album.name);
+    if (!album.coverUrl) el.style.background = gradientFor(album.id);
+    attachCoverInteractions(el, { isCurrent: false, album });
+    return el;
+  }
+
+  /* 캐러셀 안의 커버 하나에 상호작용을 건다.
+     - 중앙(현재) 커버: 짧게 클릭하면 그 앨범의 트랙 목록 보기로 이동, 꾹 누르면 캐러셀 펼침
+     - 다른(흐릿한) 커버: 클릭하면 그 앨범을 새로운 "현재"로 채택해 모달 내용을 교체 */
+  function attachCoverInteractions(el, { isCurrent, album }) {
+    if (isCurrent) {
+      attachCoverLongPress(el, {
+        onShortPress: () => {
+          if (modalCarouselExpanded) return; // 캐러셀이 펼쳐진 동안은 클릭으로 앨범 진입하지 않음(오작동 방지)
+          goToAlbumTracksFromModal();
+        },
+        onLongPress: () => { expandArtistCarousel(); },
+      });
+    } else {
+      el.addEventListener('click', () => switchModalToAlbum(album));
+    }
+  }
+
+  /* 캐러셀에서 다른 앨범을 선택했을 때: 모달의 제목/대표곡/앨범명을 그 앨범 기준으로 교체.
+     "원래 노래 제목"이 그대로면 어색하므로, 대표곡(인기도가 가장 높은 트랙)을 받아와 제목으로 사용. */
+  async function switchModalToAlbum(album) {
+    modalCurrentTrack = {
+      ...modalCurrentTrack,
+      albumId: album.id,
+      album: album.name,
+      coverUrl: album.coverUrl,
+      // title은 대표곡 조회가 끝난 뒤 갱신 — 우선 앨범명을 임시로 보여줘 어색한 공백을 줄임
+      title: '대표곡을 불러오는 중…',
+    };
+
+    updateModalText({
+      title: '대표곡을 불러오는 중…',
+      artist: modalCurrentArtistName,
+      album: album.name,
+    });
+    renderModalCoverCenterOnly(album.coverUrl, album.id);
+
+    try {
+      const res = await fetch(`/api/music/album/${encodeURIComponent(album.id)}?offset=0`, {
+        credentials: 'same-origin',
+      });
+      let data = {};
+      try { data = await res.json(); } catch (_) { /* noop */ }
+      if (!res.ok) throw new Error(data.error || '앨범 정보를 불러오지 못했어요.');
+
+      const repTitle = data.representativeTrackTitle || album.name;
+      modalCurrentTrack.title = repTitle;
+      updateModalText({ title: repTitle, artist: modalCurrentArtistName, album: album.name });
+    } catch (err) {
+      // 대표곡 조회가 실패해도 앨범명/커버는 이미 갱신되어 있으니 제목만 앨범명으로 대체
+      modalCurrentTrack.title = album.name;
+      updateModalText({ title: album.name, artist: modalCurrentArtistName, album: album.name });
+    }
+  }
+
+  /* switchModalToAlbum 중간에, 캐러셀은 유지한 채로 "현재" 표시만 새 앨범으로 옮기고 싶을 때 사용.
+     (캐러셀을 다시 접지 않고, 가운데 칸의 내용만 바꿔서 자연스럽게 이어지게) */
+  function renderModalCoverCenterOnly(coverUrl, albumId) {
+    const centerEl = coverCarouselTrack.querySelector('.carousel-cover-item.is-current');
+    if (!centerEl) return;
+    centerEl.dataset.albumId = albumId || '';
+    centerEl.innerHTML = buildCoverCellHtml(coverUrl, modalCurrentArtistName);
+    centerEl.style.background = coverUrl ? '' : gradientFor(albumId || modalCurrentArtistName);
+  }
+
+  /* 모달 커버(또는 캐러셀 중앙 커버)를 짧게 클릭했을 때: 모달을 닫고 그 앨범의 트랙들을 검색 결과로 표시 */
+  function goToAlbumTracksFromModal() {
+    if (!modalCurrentTrack?.albumId) return;
+    closeTrackModal();
+    loadAlbumTracks(modalCurrentTrack.albumId);
+  }
+
+  /* ── 모달 안 커버 전용 롱프레스 감지 (카드 롱프레스와 별개 인스턴스) ── */
+  function attachCoverLongPress(el, { onShortPress, onLongPress }) {
+    let timer = null;
+    let startX = 0, startY = 0, triggered = false;
+
+    function clear() {
+      window.clearTimeout(timer);
+      timer = null;
+      el.classList.remove('is-pressing');
+    }
+    function start(x, y) {
+      triggered = false;
+      startX = x; startY = y;
+      timer = window.setTimeout(() => {
+        triggered = true;
+        onLongPress();
+      }, LONG_PRESS_MS);
+    }
+    function move(x, y) {
+      if (!timer) return;
+      if (Math.abs(x - startX) > MOVE_CANCEL_PX || Math.abs(y - startY) > MOVE_CANCEL_PX) clear();
+    }
+    function end() {
+      const was = triggered;
+      clear();
+      if (!was) onShortPress();
+    }
+
+    el.addEventListener('mousedown', e => start(e.clientX, e.clientY));
+    el.addEventListener('mousemove', e => move(e.clientX, e.clientY));
+    el.addEventListener('mouseup', end);
+    el.addEventListener('mouseleave', clear);
+    el.addEventListener('touchstart', e => { const t = e.touches[0]; start(t.clientX, t.clientY); }, { passive: true });
+    el.addEventListener('touchmove',  e => { const t = e.touches[0]; move(t.clientX, t.clientY); }, { passive: true });
+    el.addEventListener('touchend', end);
+    el.addEventListener('touchcancel', clear);
+    el.addEventListener('contextmenu', e => e.preventDefault());
+  }
 
   /* 초기 상태 */
   showOnly('empty');
