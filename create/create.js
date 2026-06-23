@@ -163,8 +163,77 @@
         <svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
       </span>
     `;
-    card.addEventListener('click', () => toggleTrack(track));
+    attachLongPress(card, track);
     return card;
+  }
+
+  /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     롱프레스(꾹 누르기) 감지
+     - 일정 시간(LONG_PRESS_MS) 동안 누르고 있으면 상세 모달을 띄움
+     - 그보다 짧게 떼면 일반 클릭으로 처리해 선택 토글
+     - 마우스/터치 둘 다 지원
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+  const LONG_PRESS_MS = 480;
+  const MOVE_CANCEL_PX = 10; // 누른 채로 이만큼 움직이면 스크롤 의도로 보고 취소
+
+  function attachLongPress(card, track) {
+    let timer = null;
+    let startX = 0;
+    let startY = 0;
+    let triggered = false; // 이번 누름에서 롱프레스가 실제로 발동했는지
+
+    function clearPress() {
+      window.clearTimeout(timer);
+      timer = null;
+      card.classList.remove('is-pressing');
+    }
+
+    function startPress(x, y) {
+      triggered = false;
+      startX = x;
+      startY = y;
+      card.classList.add('is-pressing');
+      timer = window.setTimeout(() => {
+        triggered = true;
+        card.classList.remove('is-pressing');
+        openTrackModal(track);
+      }, LONG_PRESS_MS);
+    }
+
+    function movePress(x, y) {
+      if (!timer) return;
+      const dx = Math.abs(x - startX);
+      const dy = Math.abs(y - startY);
+      if (dx > MOVE_CANCEL_PX || dy > MOVE_CANCEL_PX) clearPress();
+    }
+
+    function endPress() {
+      const wasTriggered = triggered;
+      clearPress();
+      // 롱프레스가 발동되지 않은 짧은 클릭/탭이었다면 평소처럼 선택 토글
+      if (!wasTriggered) toggleTrack(track);
+    }
+
+    // 마우스
+    card.addEventListener('mousedown', e => startPress(e.clientX, e.clientY));
+    card.addEventListener('mousemove', e => movePress(e.clientX, e.clientY));
+    card.addEventListener('mouseup', endPress);
+    card.addEventListener('mouseleave', clearPress);
+
+    // 터치(모바일)
+    card.addEventListener('touchstart', e => {
+      const t = e.touches[0];
+      startPress(t.clientX, t.clientY);
+    }, { passive: true });
+    card.addEventListener('touchmove', e => {
+      const t = e.touches[0];
+      movePress(t.clientX, t.clientY);
+    }, { passive: true });
+    card.addEventListener('touchend', endPress);
+    card.addEventListener('touchcancel', clearPress);
+
+    // 브라우저 기본 우클릭 메뉴/드래그 등이 롱프레스를 방해하지 않도록
+    card.addEventListener('contextmenu', e => e.preventDefault());
   }
 
   // 검색 결과로 받은 트랙들을 id로 빠르게 찾기 위한 캐시.
@@ -331,6 +400,48 @@
     // 실제 플레이리스트 생성 로직(서버 저장 등)이 들어갈 자리.
     // 지금은 UI 동작 시연 단계라 담은 곡 목록만 안내.
     alert(`"${selectedOrder.length}곡"으로 플레이리스트를 만들 준비가 됐어요!\n(플레이리스트 저장 기능은 다음 단계에서 연결할게요)`);
+  });
+
+  /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     트랙 상세 모달 — 가수 이름, 앨범 커버, 앨범 이름을 보여줌
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+  const trackModalBackdrop = document.getElementById('trackModalBackdrop');
+  const trackModalClose    = document.getElementById('trackModalClose');
+  const modalTrackCover    = document.getElementById('modalTrackCover');
+  const modalTrackTitle    = document.getElementById('modalTrackTitle');
+  const modalTrackArtist   = document.getElementById('modalTrackArtist');
+  const modalTrackAlbum    = document.getElementById('modalTrackAlbum');
+
+  function openTrackModal(track) {
+    modalTrackTitle.textContent = track.title;
+    modalTrackArtist.textContent = track.artist;
+    modalTrackAlbum.textContent = track.album || '정보 없음';
+
+    if (track.coverUrl) {
+      modalTrackCover.style.background = '';
+      modalTrackCover.innerHTML = `<img src="${track.coverUrl}" alt="">`;
+    } else {
+      modalTrackCover.style.background = gradientFor(track.id);
+      modalTrackCover.innerHTML = initials(track.artist);
+    }
+
+    trackModalBackdrop.hidden = false;
+    // hidden을 막 푼 직후에 곧바로 클래스를 추가해야 트랜지션(등장 애니메이션)이 재생됨
+    requestAnimationFrame(() => trackModalBackdrop.classList.add('is-open'));
+  }
+
+  function closeTrackModal() {
+    trackModalBackdrop.classList.remove('is-open');
+    // 사라지는 애니메이션이 끝난 뒤에 완전히 숨김(hidden) 처리
+    window.setTimeout(() => { trackModalBackdrop.hidden = true; }, 200);
+  }
+
+  trackModalClose.addEventListener('click', closeTrackModal);
+  trackModalBackdrop.addEventListener('click', e => {
+    if (e.target === trackModalBackdrop) closeTrackModal(); // 배경 클릭 시에만 닫기
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !trackModalBackdrop.hidden) closeTrackModal();
   });
 
   /* 초기 상태 */
