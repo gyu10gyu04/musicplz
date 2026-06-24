@@ -151,7 +151,7 @@
 
     // Spotify가 앨범 커버 이미지를 줬으면 그걸 쓰고, 없으면 이니셜+그라디언트로 대체
     const coverInner = track.coverUrl
-      ? `<img src="${track.coverUrl}" alt="" loading="lazy">`
+      ? `<img src="${track.coverUrl}" alt="" loading="lazy" draggable="false">`
       : initials(track.artist);
     const coverStyle = track.coverUrl ? '' : `style="background:${gradientFor(track.id)}"`;
 
@@ -224,10 +224,14 @@
     card.addEventListener('mouseleave', clearPress);
 
     // 터치(모바일)
+    // touchstart에서 preventDefault를 호출해, iOS/Android 브라우저의 기본
+    // "이미지 길게 눌러서 저장/공유" 메뉴가 캐러셀 롱프레스보다 먼저 뜨는 것을 막는다.
+    // (touchmove는 계속 passive로 둬서 스크롤 성능에는 영향이 없도록 유지)
     card.addEventListener('touchstart', e => {
+      e.preventDefault();
       const t = e.touches[0];
       startPress(t.clientX, t.clientY);
-    }, { passive: true });
+    }, { passive: false });
     card.addEventListener('touchmove', e => {
       const t = e.touches[0];
       movePress(t.clientX, t.clientY);
@@ -493,7 +497,7 @@
       const chip = document.createElement('div');
       chip.className = 'tray-chip';
       const coverInner = track.coverUrl
-        ? `<img src="${track.coverUrl}" alt="" loading="lazy">`
+        ? `<img src="${track.coverUrl}" alt="" loading="lazy" draggable="false">`
         : initials(track.artist);
       const coverStyle = track.coverUrl ? '' : `style="background:${gradientFor(track.id)}"`;
       chip.innerHTML = `
@@ -546,7 +550,7 @@
   let modalCarouselExpanded = false;
 
   function buildCoverCellHtml(coverUrl, labelForInitials) {
-    if (coverUrl) return `<img src="${coverUrl}" alt="" loading="lazy">`;
+    if (coverUrl) return `<img src="${coverUrl}" alt="" loading="lazy" draggable="false">`;
     return initials(labelForInitials);
   }
 
@@ -823,7 +827,13 @@
     el.addEventListener('mousemove', e => move(e.clientX, e.clientY));
     el.addEventListener('mouseup', end);
     el.addEventListener('mouseleave', clear);
-    el.addEventListener('touchstart', e => { const t = e.touches[0]; start(t.clientX, t.clientY); }, { passive: true });
+    // touchstart에서 preventDefault를 호출해, 모바일 브라우저의 기본
+    // "이미지 길게 눌러서 저장/공유" 메뉴가 캐러셀 롱프레스보다 먼저 뜨는 것을 막는다.
+    el.addEventListener('touchstart', e => {
+      e.preventDefault();
+      const t = e.touches[0];
+      start(t.clientX, t.clientY);
+    }, { passive: false });
     el.addEventListener('touchmove',  e => { const t = e.touches[0]; move(t.clientX, t.clientY); }, { passive: true });
     el.addEventListener('touchend', end);
     el.addEventListener('touchcancel', clear);

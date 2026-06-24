@@ -204,6 +204,10 @@ nav{
   padding:12px 14px;cursor:pointer;
   transition:border-color .15s,transform .15s,box-shadow .15s;
   position:relative;
+  -webkit-touch-callout:none;
+  -webkit-user-select:none;
+  user-select:none;
+  -webkit-tap-highlight-color:transparent;
 }
 .track-card:hover{
   border-color:#d8d2e8;
@@ -222,9 +226,17 @@ nav{
   letter-spacing:-.3px;
   overflow:hidden;
   background:#ece9f2; /* 이미지 로딩 전 잠깐 보이는 배경 */
+  -webkit-touch-callout:none;
+  -webkit-user-select:none;
+  user-select:none;
+  -webkit-tap-highlight-color:transparent;
 }
 .track-cover img{
   width:100%;height:100%;object-fit:cover;display:block;
+  -webkit-touch-callout:none;
+  -webkit-user-select:none;
+  user-select:none;
+  pointer-events:none;
 }
 
 .track-info{flex:1;min-width:0;}
@@ -415,9 +427,20 @@ nav{
   cursor:pointer;
   transition:opacity .28s ease, transform .28s ease;
   position:relative;
+  /* 모바일에서 길게 누르면 브라우저 기본 "이미지 저장/공유" 메뉴가 뜨는 것을 방지
+     (이게 빠져있으면 캐러셀 롱프레스보다 브라우저 기본 동작이 먼저 발동함) */
+  -webkit-touch-callout:none;
+  -webkit-user-select:none;
+  user-select:none;
+  -webkit-tap-highlight-color:transparent;
+  touch-action:pan-x; /* 좌우 스크롤은 허용하되, 길게 누르기로 인한 확대/메뉴는 막음 */
 }
 .carousel-cover-item img{
   width:100%;height:100%;object-fit:cover;display:block;
+  -webkit-touch-callout:none;
+  -webkit-user-select:none;
+  user-select:none;
+  pointer-events:none; /* 이미지 자체가 아니라 부모(carousel-cover-item)가 모든 터치/클릭을 받도록 */
 }
 
 /* 누르고 있는 동안의 "눌림" 피드백 — 길게 눌러도, 짧게 눌러도 즉시 반응이 보이도록 */
