@@ -618,6 +618,22 @@
     if (e.key === 'Escape' && !trackModalBackdrop.hidden) closeTrackModal();
   });
 
+  /* 같은 가수의 다른 앨범이 없을 때, 캐러셀 힌트 영역에 짧게 안내 문구를 보여줌
+     (조용히 아무 반응 없는 것보다, "다른 앨범이 없다"는 걸 알려주는 게 덜 헷갈림) */
+  let noAlbumsHintTimer = null;
+  function showNoOtherAlbumsHint() {
+    window.clearTimeout(noAlbumsHintTimer);
+    const original = carouselHint.textContent;
+    carouselHint.textContent = '이 가수의 다른 앨범은 아직 없어요';
+    carouselHint.hidden = false;
+    carouselHint.classList.add('is-notice');
+    noAlbumsHintTimer = window.setTimeout(() => {
+      carouselHint.hidden = true;
+      carouselHint.classList.remove('is-notice');
+      carouselHint.textContent = original || '← 좌우로 넘겨서 다른 앨범 보기 →';
+    }, 1800);
+  }
+
   /* ── 캐러셀: 같은 가수의 다른 앨범들 가져오기 (최초 펼칠 때 한 번만 요청, 이후 캐싱) ── */
   async function fetchArtistAlbumsIfNeeded() {
     if (modalArtistAlbums) return modalArtistAlbums; // 이미 받아온 경우 재사용
@@ -648,10 +664,15 @@
     const centerAlbumName = modalCurrentTrack.album;
 
     const albums = await fetchArtistAlbumsIfNeeded();
-    if (!albums || albums.length === 0) return; // 다른 앨범 정보가 없으면 캐러셀을 펼치지 않음
+    const others = (albums || []).filter(a => a.id !== centerAlbumId);
+
+    if (others.length === 0) {
+      // 다른 앨범이 없는 경우: 조용히 무시하지 않고, "다른 앨범이 없다"고 짧게 알려줌
+      showNoOtherAlbumsHint();
+      return;
+    }
 
     // 현재 앨범을 목록 중앙에 두고, 나머지를 좌우로 배치
-    const others = albums.filter(a => a.id !== centerAlbumId);
     const half = Math.ceil(others.length / 2);
     const leftSide = others.slice(0, half).reverse(); // 중앙에 가까운 게 먼저 오도록
     const rightSide = others.slice(half);
@@ -781,8 +802,10 @@
     function start(x, y) {
       triggered = false;
       startX = x; startY = y;
+      el.classList.add('is-pressing');
       timer = window.setTimeout(() => {
         triggered = true;
+        el.classList.remove('is-pressing');
         onLongPress();
       }, LONG_PRESS_MS);
     }

@@ -420,6 +420,13 @@ nav{
   width:100%;height:100%;object-fit:cover;display:block;
 }
 
+/* 누르고 있는 동안의 "눌림" 피드백 — 길게 눌러도, 짧게 눌러도 즉시 반응이 보이도록 */
+.carousel-cover-item.is-pressing{
+  transform:scale(.94);
+  box-shadow:0 4px 14px rgba(0,0,0,.16);
+  transition:transform .12s ease, box-shadow .12s ease;
+}
+
 /* 현재(중앙) 트랙의 커버는 항상 또렷하게 */
 .carousel-cover-item.is-current{
   opacity:1;
@@ -441,8 +448,12 @@ nav{
 .carousel-hint{
   margin-top:10px;text-align:center;
   font-size:.72rem;color:rgba(0,0,0,.34);
+  transition:color .15s ease;
 }
 .carousel-hint[hidden]{display:none;}
+.carousel-hint.is-notice{
+  color:#b5862f;font-weight:600;
+}
 
 .track-modal-title{
   font-size:1.18rem;font-weight:800;color:#0a0a0a;

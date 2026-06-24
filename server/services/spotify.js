@@ -213,7 +213,7 @@ async function getArtistAlbums(artistId, offset = 0, limit = 20) {
   const url = `${SPOTIFY_API_BASE}/artists/${artistId}/albums?` + new URLSearchParams({
     offset: String(offset),
     limit: String(cappedLimit),
-    include_groups: 'album,single', // 정규 앨범과 싱글만 (피처링/컴필레이션 제외해 결과를 깔끔하게)
+    include_groups: 'album,single,compilation', // 정규 앨범+싱글+컴필레이션 (피처링은 제외해 결과를 깔끔하게)
   });
 
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
