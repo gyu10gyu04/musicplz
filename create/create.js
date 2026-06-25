@@ -178,6 +178,7 @@
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
   const LONG_PRESS_MS = 480;
   const MOVE_CANCEL_PX = 10; // 누른 채로 이만큼 움직이면 스크롤 의도로 보고 취소
+  const COVER_MOVE_CANCEL_PX = 24; // 모달 안 커버는 스크롤 영역이 아니므로, 손 떨림에 더 관대하게 둠
 
   function attachLongPress(card, track) {
     let timer = null;
@@ -815,7 +816,7 @@
     }
     function move(x, y) {
       if (!timer) return;
-      if (Math.abs(x - startX) > MOVE_CANCEL_PX || Math.abs(y - startY) > MOVE_CANCEL_PX) clear();
+      if (Math.abs(x - startX) > COVER_MOVE_CANCEL_PX || Math.abs(y - startY) > COVER_MOVE_CANCEL_PX) clear();
     }
     function end() {
       const was = triggered;

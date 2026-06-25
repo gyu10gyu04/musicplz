@@ -12,6 +12,12 @@ const SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token';
 const SPOTIFY_API_BASE = 'https://api.spotify.com/v1';
 const SPOTIFY_SEARCH_URL = `${SPOTIFY_API_BASE}/search`;
 
+// Client Credentials flow(사용자 로그인 없는 서버 인증)로 요청하면 Spotify는
+// 사용자의 국가 정보를 알 수 없습니다. market 파라미터를 명시하지 않으면
+// 일부 엔드포인트(특히 아티스트 앨범 목록 조회)가 콘텐츠를 "이용 불가"로 취급해
+// 실제로는 앨범이 있는데도 빈 목록을 반환하는 문제가 있어, 항상 명시적으로 지정합니다.
+const MARKET = 'KR';
+
 let cachedToken = null;
 let tokenExpiresAt = 0; // epoch ms
 
@@ -72,6 +78,7 @@ async function searchTracks(query, limit = 10) {
     q: query,
     type: 'track',
     limit: String(cappedLimit),
+    market: MARKET,
   });
 
   const res = await fetch(url, {
@@ -118,7 +125,7 @@ async function getAlbumTracks(albumId, offset = 0, limit = 20) {
   const cappedLimit = Math.min(Math.max(limit, 1), 50);
 
   // 1) 앨범 기본 정보(이름, 커버, 아티스트) 조회
-  const albumRes = await fetch(`${SPOTIFY_API_BASE}/albums/${albumId}`, {
+  const albumRes = await fetch(`${SPOTIFY_API_BASE}/albums/${albumId}?market=${MARKET}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!albumRes.ok) {
@@ -131,6 +138,7 @@ async function getAlbumTracks(albumId, offset = 0, limit = 20) {
   const tracksUrl = `${SPOTIFY_API_BASE}/albums/${albumId}/tracks?` + new URLSearchParams({
     offset: String(offset),
     limit: String(cappedLimit),
+    market: MARKET,
   });
   const tracksRes = await fetch(tracksUrl, {
     headers: { Authorization: `Bearer ${token}` },
@@ -186,7 +194,7 @@ async function fetchTrackPopularities(trackIds, token) {
   const validIds = trackIds.filter(Boolean);
   if (validIds.length === 0) return map;
 
-  const url = `${SPOTIFY_API_BASE}/tracks?` + new URLSearchParams({ ids: validIds.join(',') });
+  const url = `${SPOTIFY_API_BASE}/tracks?` + new URLSearchParams({ ids: validIds.join(','), market: MARKET });
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) return map; // 실패해도 popularity는 0으로 처리되도록 조용히 빈 맵 반환
 
@@ -214,6 +222,7 @@ async function getArtistAlbums(artistId, offset = 0, limit = 20) {
     offset: String(offset),
     limit: String(cappedLimit),
     include_groups: 'album,single,compilation', // 정규 앨범+싱글+컴필레이션 (피처링은 제외해 결과를 깔끔하게)
+    market: MARKET,
   });
 
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
