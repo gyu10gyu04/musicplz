@@ -40,6 +40,9 @@ router.post('/search', async (req, res, next) => {
     // 2) Spotify에서 실제 곡 검색
     const tracks = await searchTracks(interpretation.searchQuery, 10);
 
+    console.log(`[검색 결과] "${interpretation.searchQuery}" → ${tracks.length}곡:`,
+      tracks.map(t => `${t.title}(artistId=${t.artistId})`).join(' / '));
+
     res.json({
       interpretation: interpretation.interpretation,
       tags: interpretation.tags,
@@ -92,10 +95,15 @@ router.get('/artist/:artistId/albums', async (req, res, next) => {
     const { artistId } = req.params;
     const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
 
+    console.log(`[아티스트 앨범 조회] artistId="${artistId}", offset=${offset}`);
+
     const { albums, total, hasMore } = await getArtistAlbums(artistId, offset, 30);
+
+    console.log(`[아티스트 앨범 조회 결과] artistId="${artistId}" → 앨범 ${albums.length}개 (전체 ${total}개): ${albums.map(a => a.name).join(', ')}`);
 
     res.json({ albums, total, hasMore, nextOffset: hasMore ? offset + albums.length : null });
   } catch (err) {
+    console.error(`[아티스트 앨범 조회 실패] artistId="${req.params.artistId}":`, err.message);
     next(err);
   }
 });
