@@ -369,14 +369,14 @@ nav{
   box-shadow:0 24px 60px rgba(0,0,0,.22);
   transform:scale(.92) translateY(10px);
   opacity:0;
-  transition:transform .22s cubic-bezier(.34,1.56,.64,1), opacity .18s ease, max-width .32s cubic-bezier(.22,1,.36,1);
+  transition:transform .22s cubic-bezier(.34,1.56,.64,1), opacity .18s ease;
 }
 .track-modal-backdrop.is-open .track-modal{
   transform:scale(1) translateY(0);
   opacity:1;
 }
 .track-modal.is-carousel-open{
-  max-width:560px; /* 캐러셀이 펼쳐지면 모달 자체가 넓어져서 좌우 카드가 보일 공간을 만듦 */
+  max-width:340px;
 }
 
 .track-modal-close{
@@ -453,7 +453,8 @@ nav{
 /* 현재(중앙) 트랙의 커버는 항상 또렷하게 */
 .carousel-cover-item.is-current{
   opacity:1;
-  cursor:default;
+  cursor:pointer;
+  z-index:3;
 }
 /* 캐러셀이 접힌 상태에선 다른 앨범 카드들을 화면 흐름에서 제거 */
 .cover-carousel-track:not(.is-expanded) .carousel-cover-item:not(.is-current){
@@ -463,9 +464,24 @@ nav{
    (크기는 중앙 커버와 동일하게 유지 — 투명도만으로 구분) */
 .cover-carousel-track.is-expanded .carousel-cover-item:not(.is-current){
   opacity:.45;
+  z-index:1;
 }
 .cover-carousel-track.is-expanded .carousel-cover-item:not(.is-current):hover{
   opacity:.8;
+}
+
+.cover-carousel-track.is-expanded{
+  justify-content:flex-start;
+  gap:0;
+  padding:2px calc(50% - 74px);
+}
+
+.cover-carousel-track.is-expanded .carousel-cover-item{
+  scroll-snap-align:center;
+}
+
+.cover-carousel-track.is-expanded .carousel-cover-item + .carousel-cover-item{
+  margin-left:-76px;
 }
 
 .carousel-hint{

@@ -669,9 +669,6 @@
     if (modalCarouselExpanded) return;
 
     const centerAlbumId = modalCurrentTrack.albumId;
-    const centerCoverUrl = modalCurrentTrack.coverUrl;
-    const centerAlbumName = modalCurrentTrack.album;
-
     const albums = await fetchArtistAlbumsIfNeeded();
     const others = (albums || []).filter(a => a.id !== centerAlbumId);
 
@@ -680,6 +677,15 @@
       showNoOtherAlbumsHint();
       return;
     }
+
+    renderExpandedArtistCarousel();
+  }
+
+  function renderExpandedArtistCarousel() {
+    const centerAlbumId = modalCurrentTrack.albumId;
+    const centerCoverUrl = modalCurrentTrack.coverUrl;
+    const albums = Array.isArray(modalArtistAlbums) ? modalArtistAlbums : [];
+    const others = albums.filter(a => a.id !== centerAlbumId);
 
     // 현재 앨범을 목록 중앙에 두고, 나머지를 좌우로 배치
     const half = Math.ceil(others.length / 2);
@@ -734,7 +740,6 @@
     if (isCurrent) {
       attachCoverLongPress(el, {
         onShortPress: () => {
-          if (modalCarouselExpanded) return; // 캐러셀이 펼쳐진 동안은 클릭으로 앨범 진입하지 않음(오작동 방지)
           goToAlbumTracksFromModal();
         },
         onLongPress: () => { expandArtistCarousel(); },
@@ -761,7 +766,11 @@
       artist: modalCurrentArtistName,
       album: album.name,
     });
-    renderModalCoverCenterOnly(album.coverUrl, album.id);
+    if (modalCarouselExpanded) {
+      renderExpandedArtistCarousel();
+    } else {
+      renderModalCoverCenterOnly(album.coverUrl, album.id);
+    }
 
     try {
       const res = await fetch(`/api/music/album/${encodeURIComponent(album.id)}?offset=0`, {
