@@ -122,7 +122,10 @@ async function getAlbumTracks(albumId, offset = 0, limit = 20) {
   if (!albumId) throw new Error('albumId가 필요합니다.');
 
   const token = await getAccessToken();
-  const cappedLimit = Math.min(Math.max(limit, 1), 50);
+  const parsedLimit = parseInt(limit, 10);
+  const cappedLimit = isNaN(parsedLimit) ? 20 : Math.min(Math.max(parsedLimit, 1), 50);
+  const parsedOffset = parseInt(offset, 10);
+  const safeOffset = isNaN(parsedOffset) ? 0 : Math.max(parsedOffset, 0);
 
   // 1) 앨범 기본 정보(이름, 커버, 아티스트) 조회
   const albumRes = await fetch(`${SPOTIFY_API_BASE}/albums/${albumId}?market=${MARKET}`, {
@@ -136,7 +139,7 @@ async function getAlbumTracks(albumId, offset = 0, limit = 20) {
 
   // 2) 해당 앨범의 트랙 목록 (페이지네이션)
   const tracksUrl = `${SPOTIFY_API_BASE}/albums/${albumId}/tracks?` + new URLSearchParams({
-    offset: String(offset),
+    offset: String(safeOffset),
     limit: String(cappedLimit),
     market: MARKET,
   });
@@ -216,10 +219,13 @@ async function getArtistAlbums(artistId, offset = 0, limit = 20) {
   if (!artistId) throw new Error('artistId가 필요합니다.');
 
   const token = await getAccessToken();
-  const cappedLimit = Math.min(Math.max(limit, 1), 50);
+  const parsedLimit = parseInt(limit, 10);
+  const cappedLimit = isNaN(parsedLimit) ? 20 : Math.min(Math.max(parsedLimit, 1), 50);
+  const parsedOffset = parseInt(offset, 10);
+  const safeOffset = isNaN(parsedOffset) ? 0 : Math.max(parsedOffset, 0);
 
   const url = `${SPOTIFY_API_BASE}/artists/${artistId}/albums?` + new URLSearchParams({
-    offset: String(offset),
+    offset: String(safeOffset),
     limit: String(cappedLimit),
     include_groups: 'album,single,compilation', // 정규 앨범+싱글+컴필레이션 (피처링은 제외해 결과를 깔끔하게)
     market: MARKET,
