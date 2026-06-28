@@ -98,11 +98,22 @@ router.get('/artist/:artistId/albums', async (req, res, next) => {
 
     console.log(`[아티스트 앨범 조회] artistId="${artistId}", artistName="${artistName}", offset=${offset}`);
 
-    const { albums, total, hasMore } = await getArtistAlbums(artistId, offset, 30);
+    let spotifyAlbumsResult = { albums: [], total: 0, hasMore: false };
+    let spotifyLookupError = null;
+
+    try {
+      spotifyAlbumsResult = await getArtistAlbums(artistId, offset, 10);
+    } catch (err) {
+      spotifyLookupError = err;
+      console.error(`[Spotify 아티스트 앨범 조회 실패 - fallback 시도] artistId="${artistId}":`, err.message);
+    }
+
+    const { albums, total, hasMore } = spotifyAlbumsResult;
 
     console.log(`[아티스트 앨범 조회 결과] artistId="${artistId}" → 앨범 ${albums.length}개 (전체 ${total}개): ${albums.map(a => a.name).join(', ')}`);
 
     if (albums.length > 0 || !artistName || offset > 0) {
+      if (spotifyLookupError && !artistName) throw spotifyLookupError;
       return res.json({ albums, total, hasMore, nextOffset: hasMore ? offset + albums.length : null, source: 'spotify-artist' });
     }
 

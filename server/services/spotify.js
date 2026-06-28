@@ -214,15 +214,15 @@ async function fetchTrackPopularities(trackIds, token) {
  * 특정 아티스트가 발매한 다른 앨범들을 가져옵니다.
  * @param {string} artistId
  * @param {number} offset
- * @param {number} limit - 최대 50
+ * @param {number} limit - Spotify 정책상 최대 10
  * @returns {Promise<{albums: Array, total: number, hasMore: boolean}>}
  */
-async function getArtistAlbums(artistId, offset = 0, limit = 20) {
+async function getArtistAlbums(artistId, offset = 0, limit = 10) {
   if (!artistId) throw new Error('artistId가 필요합니다.');
 
   const token = await getAccessToken();
   const parsedLimit = parseInt(limit, 10);
-  const cappedLimit = isNaN(parsedLimit) ? 20 : Math.min(Math.max(parsedLimit, 1), 50);
+  const cappedLimit = isNaN(parsedLimit) ? 10 : Math.min(Math.max(parsedLimit, 1), 10);
   const parsedOffset = parseInt(offset, 10);
   const safeOffset = isNaN(parsedOffset) ? 0 : Math.max(parsedOffset, 0);
 
