@@ -370,6 +370,7 @@ nav{
   transform:scale(.92) translateY(10px);
   opacity:0;
   transition:transform .22s cubic-bezier(.34,1.56,.64,1), opacity .18s ease;
+  overflow:visible;
 }
 .track-modal-backdrop.is-open .track-modal{
   transform:scale(1) translateY(0);
@@ -395,16 +396,16 @@ nav{
 /* ── 커버 영역 + 좌우 아티스트 다른 앨범 캐러셀 ── */
 .track-modal-cover-row{
   margin:4px 0 20px;
-  overflow:hidden;
+  overflow:visible;
 }
 
 .cover-carousel-track{
   position:relative;
-  height:152px;
+  height:160px;
   display:flex;align-items:center;justify-content:center;
   overflow:hidden;
   padding:2px 4px;
-  perspective:720px;
+  perspective:600px;
   transform-style:preserve-3d;
   -ms-overflow-style:none;
   scrollbar-width:none;
@@ -470,52 +471,63 @@ nav{
 .cover-carousel-track:not(.is-expanded) .carousel-cover-item:not(.is-current){
   display:none;
 }
-/* 펼쳐졌을 때, 양옆의 다른 앨범 커버는 흐릿하게 보여서 "더 있다"는 느낌을 줌
-   (크기는 중앙 커버와 동일하게 유지 — 투명도만으로 구분) */
+/* 펼쳐졌을 때, 양옆의 다른 앨범 커버는 흐릿하게 보여서 "더 있다"는 느낌을 줌 */
 .cover-carousel-track.is-expanded .carousel-cover-item:not(.is-current){
-  opacity:.34;
+  opacity:.42;
   z-index:1;
-  filter:saturate(.82) brightness(1.04);
+  filter:saturate(.8) brightness(1.04);
 }
 .cover-carousel-track.is-expanded .carousel-cover-item:not(.is-current):hover{
-  opacity:.54;
+  opacity:.62;
 }
 
 .cover-carousel-track.is-expanded{
-  overflow:hidden;
+  overflow:visible;
 }
 
 .cover-carousel-track.is-expanded .carousel-cover-item{
   position:absolute;
-  top:2px;
+  top:50%;
   left:50%;
   margin:0;
   transform-origin:center center;
   will-change:transform, opacity, filter;
 }
 
+/* ── 정지 상태 ─────────────────────────────────────────────
+   사진 기준:
+   - 중앙: 크고 앞에, 또렷
+   - 좌우: 작고 뒤에, 흐릿, 중앙과 겹쳐서 살짝 보임
+   translateY(-50%)는 top:50% 보정 (수직 중앙 정렬)
+──────────────────────────────────────────────────────────── */
 .cover-carousel-track.is-expanded .carousel-cover-item--left{
-  transform:translateX(-112%) translateZ(-48px) rotateY(52deg) scale(.82);
+  transform:translate(-50%,-50%) translateX(-74px) translateZ(-60px) rotateY(28deg) scale(.72);
+  z-index:1;
 }
 
 .cover-carousel-track.is-expanded .carousel-cover-item--center{
-  transform:translateX(-50%) translateZ(72px) rotateY(0deg) scale(1);
+  transform:translate(-50%,-50%) translateZ(0px) rotateY(0deg) scale(1);
+  z-index:3;
 }
 
 .cover-carousel-track.is-expanded .carousel-cover-item--right{
-  transform:translateX(12%) translateZ(-48px) rotateY(-52deg) scale(.82);
+  transform:translate(-50%,-50%) translateX(74px) translateZ(-60px) rotateY(-28deg) scale(.72);
+  z-index:1;
 }
 
+/* ── 다음으로 이동 중 (→ 방향) ──────────────────────────── */
 .cover-carousel-track.is-expanded.is-moving-next .carousel-cover-item--left{
-  opacity:.08;
-  transform:translateX(-148%) translateZ(-120px) rotateY(82deg) scale(.68);
+  opacity:.05;
+  transform:translate(-50%,-50%) translateX(-130px) translateZ(-140px) rotateY(55deg) scale(.5);
+  z-index:0;
 }
 
 .cover-carousel-track.is-expanded.is-moving-next .carousel-cover-item--center{
-  opacity:.34;
+  opacity:.42;
   z-index:1;
-  filter:saturate(.82) brightness(1.04);
-  transform:translateX(-112%) translateZ(-48px) rotateY(52deg) scale(.82);
+  filter:saturate(.8) brightness(1.04);
+  box-shadow:0 8px 20px rgba(0,0,0,.12);
+  transform:translate(-50%,-50%) translateX(-74px) translateZ(-60px) rotateY(28deg) scale(.72);
 }
 
 .cover-carousel-track.is-expanded.is-moving-next .carousel-cover-item--right{
@@ -523,27 +535,30 @@ nav{
   z-index:3;
   filter:none;
   box-shadow:0 18px 34px rgba(0,0,0,.18);
-  transform:translateX(-50%) translateZ(72px) rotateY(0deg) scale(1);
+  transform:translate(-50%,-50%) translateZ(0px) rotateY(0deg) scale(1);
 }
 
+/* ── 이전으로 이동 중 (← 방향) ──────────────────────────── */
 .cover-carousel-track.is-expanded.is-moving-prev .carousel-cover-item--left{
   opacity:1;
   z-index:3;
   filter:none;
   box-shadow:0 18px 34px rgba(0,0,0,.18);
-  transform:translateX(-50%) translateZ(72px) rotateY(0deg) scale(1);
+  transform:translate(-50%,-50%) translateZ(0px) rotateY(0deg) scale(1);
 }
 
 .cover-carousel-track.is-expanded.is-moving-prev .carousel-cover-item--center{
-  opacity:.34;
+  opacity:.42;
   z-index:1;
-  filter:saturate(.82) brightness(1.04);
-  transform:translateX(12%) translateZ(-48px) rotateY(-52deg) scale(.82);
+  filter:saturate(.8) brightness(1.04);
+  box-shadow:0 8px 20px rgba(0,0,0,.12);
+  transform:translate(-50%,-50%) translateX(74px) translateZ(-60px) rotateY(-28deg) scale(.72);
 }
 
 .cover-carousel-track.is-expanded.is-moving-prev .carousel-cover-item--right{
-  opacity:.08;
-  transform:translateX(48%) translateZ(-120px) rotateY(-82deg) scale(.68);
+  opacity:.05;
+  transform:translate(-50%,-50%) translateX(130px) translateZ(-140px) rotateY(-55deg) scale(.5);
+  z-index:0;
 }
 
 .carousel-hint{
