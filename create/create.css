@@ -395,18 +395,18 @@ nav{
 /* ── 커버 영역 + 좌우 아티스트 다른 앨범 캐러셀 ── */
 .track-modal-cover-row{
   margin:4px 0 20px;
-  overflow:hidden; /* 캐러셀이 접혀있을 때 좌우 카드가 안 보이도록 */
+  overflow:hidden;
 }
 
 .cover-carousel-track{
+  position:relative;
+  height:152px;
   display:flex;align-items:center;justify-content:center;
-  gap:14px;
-  overflow-x:auto;
-  scroll-snap-type:x mandatory;
-  scroll-behavior:smooth;
-  padding:2px 4px; /* 그림자가 안 잘리도록 약간의 여유 */
+  overflow:hidden;
+  padding:2px 4px;
   -ms-overflow-style:none;
   scrollbar-width:none;
+  touch-action:pan-y;
 }
 .cover-carousel-track::-webkit-scrollbar{display:none;}
 
@@ -425,7 +425,7 @@ nav{
   box-shadow:0 10px 28px rgba(0,0,0,.14);
   scroll-snap-align:center;
   cursor:pointer;
-  transition:opacity .28s ease, transform .28s ease;
+  transition:opacity .24s ease, transform .24s ease, filter .24s ease;
   position:relative;
   /* 모바일에서 길게 누르면 브라우저 기본 "이미지 저장/공유" 메뉴가 뜨는 것을 방지
      (이게 빠져있으면 캐러셀 롱프레스보다 브라우저 기본 동작이 먼저 발동함) */
@@ -433,7 +433,7 @@ nav{
   -webkit-user-select:none;
   user-select:none;
   -webkit-tap-highlight-color:transparent;
-  touch-action:pan-x; /* 좌우 스크롤은 허용하되, 길게 누르기로 인한 확대/메뉴는 막음 */
+  touch-action:pan-y;
 }
 .carousel-cover-item img{
   width:100%;height:100%;object-fit:cover;display:block;
@@ -455,6 +455,9 @@ nav{
   opacity:1;
   cursor:pointer;
   z-index:3;
+  filter:none;
+  outline:6px solid #fff;
+  box-shadow:0 18px 34px rgba(0,0,0,.18);
 }
 /* 캐러셀이 접힌 상태에선 다른 앨범 카드들을 화면 흐름에서 제거 */
 .cover-carousel-track:not(.is-expanded) .carousel-cover-item:not(.is-current){
@@ -463,25 +466,35 @@ nav{
 /* 펼쳐졌을 때, 양옆의 다른 앨범 커버는 흐릿하게 보여서 "더 있다"는 느낌을 줌
    (크기는 중앙 커버와 동일하게 유지 — 투명도만으로 구분) */
 .cover-carousel-track.is-expanded .carousel-cover-item:not(.is-current){
-  opacity:.45;
+  opacity:.34;
   z-index:1;
+  filter:saturate(.82) brightness(1.04);
 }
 .cover-carousel-track.is-expanded .carousel-cover-item:not(.is-current):hover{
-  opacity:.8;
+  opacity:.54;
 }
 
 .cover-carousel-track.is-expanded{
-  justify-content:flex-start;
-  gap:0;
-  padding:2px calc(50% - 74px);
+  overflow:hidden;
 }
 
 .cover-carousel-track.is-expanded .carousel-cover-item{
-  scroll-snap-align:center;
+  position:absolute;
+  top:2px;
+  left:50%;
+  margin:0;
 }
 
-.cover-carousel-track.is-expanded .carousel-cover-item + .carousel-cover-item{
-  margin-left:-76px;
+.cover-carousel-track.is-expanded .carousel-cover-item--left{
+  transform:translateX(-92%) scale(.82);
+}
+
+.cover-carousel-track.is-expanded .carousel-cover-item--center{
+  transform:translateX(-50%) scale(1);
+}
+
+.cover-carousel-track.is-expanded .carousel-cover-item--right{
+  transform:translateX(-8%) scale(.82);
 }
 
 .carousel-hint{

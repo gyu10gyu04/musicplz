@@ -548,7 +548,10 @@
   let modalCurrentTrack = null;       // 모달을 열게 한 원래 트랙(앨범 트랙 보기 진입점)
   let modalCurrentArtistName = '';    // 표시용 가수 이름(원본 트랙 기준, 캐러셀 전환해도 가수는 동일)
   let modalArtistAlbums = null;       // 캐러셀에 쓸 아티스트 앨범 목록(지연 로딩, 캐싱)
+  let modalCarouselAlbums = [];
+  let modalCarouselIndex = 0;
   let modalCarouselExpanded = false;
+  let carouselWheelLocked = false;
 
   function buildCoverCellHtml(coverUrl, labelForInitials) {
     if (coverUrl) return `<img src="${coverUrl}" alt="" loading="lazy" draggable="false">`;
@@ -589,6 +592,8 @@
     modalCurrentTrack = track;
     modalCurrentArtistName = track.artist;
     modalArtistAlbums = null; // 새 트랙을 열 때마다 캐러셀 데이터는 다시 받아오도록 초기화
+    modalCarouselAlbums = [];
+    modalCarouselIndex = 0;
 
     modalTrackTitle.textContent = track.title;
     modalTrackArtist.textContent = track.artist;
@@ -612,6 +617,8 @@
       coverCarouselTrack.innerHTML = '';
       coverCarouselTrack.classList.remove('is-expanded');
       modalCarouselExpanded = false;
+      modalCarouselAlbums = [];
+      modalCarouselIndex = 0;
     }, 200);
   }
 
@@ -678,59 +685,73 @@
       return;
     }
 
+    modalCarouselAlbums = buildModalCarouselAlbums(albums || []);
+    modalCarouselIndex = Math.max(0, modalCarouselAlbums.findIndex(a => a.id === centerAlbumId));
     renderExpandedArtistCarousel();
   }
 
   function renderExpandedArtistCarousel() {
-    const centerAlbumId = modalCurrentTrack.albumId;
-    const centerCoverUrl = modalCurrentTrack.coverUrl;
-    const albums = Array.isArray(modalArtistAlbums) ? modalArtistAlbums : [];
-    const others = albums.filter(a => a.id !== centerAlbumId);
+    if (modalCarouselAlbums.length === 0) {
+      modalCarouselAlbums = buildModalCarouselAlbums(modalArtistAlbums || []);
+      modalCarouselIndex = Math.max(0, modalCarouselAlbums.findIndex(a => a.id === modalCurrentTrack.albumId));
+    }
 
-    // 현재 앨범을 목록 중앙에 두고, 나머지를 좌우로 배치
-    const half = Math.ceil(others.length / 2);
-    const leftSide = others.slice(0, half).reverse(); // 중앙에 가까운 게 먼저 오도록
-    const rightSide = others.slice(half);
+    const centerAlbum = modalCarouselAlbums[modalCarouselIndex];
+    if (!centerAlbum) return;
+    const leftAlbum = albumAtCarouselOffset(-1);
+    const rightAlbum = albumAtCarouselOffset(1);
 
     coverCarouselTrack.innerHTML = '';
 
-    leftSide.forEach(album => {
-      const el = createCarouselAlbumItem(album);
-      coverCarouselTrack.appendChild(el);
-    });
-
-    const centerEl = document.createElement('div');
-    centerEl.className = 'carousel-cover-item is-current';
-    centerEl.dataset.albumId = centerAlbumId || '';
-    centerEl.innerHTML = buildCoverCellHtml(centerCoverUrl, modalCurrentArtistName);
-    if (!centerCoverUrl) centerEl.style.background = gradientFor(modalCurrentArtistName);
-    coverCarouselTrack.appendChild(centerEl);
-    attachCoverInteractions(centerEl, { isCurrent: true });
-
-    rightSide.forEach(album => {
-      const el = createCarouselAlbumItem(album);
-      coverCarouselTrack.appendChild(el);
-    });
+    coverCarouselTrack.appendChild(createCarouselAlbumItem(leftAlbum, 'left'));
+    coverCarouselTrack.appendChild(createCarouselAlbumItem(centerAlbum, 'center'));
+    coverCarouselTrack.appendChild(createCarouselAlbumItem(rightAlbum, 'right'));
 
     coverCarouselTrack.classList.add('is-expanded');
     modalCarouselExpanded = true;
     trackModal.classList.add('is-carousel-open');
     carouselHint.hidden = false;
+  }
 
-    // 펼쳐진 직후 중앙(현재) 커버가 화면 중앙에 오도록 스크롤 위치 맞춤
-    requestAnimationFrame(() => {
-      centerEl.scrollIntoView({ behavior: 'instant', inline: 'center', block: 'nearest' });
+  function buildModalCarouselAlbums(albums) {
+    const currentAlbum = {
+      id: modalCurrentTrack.albumId,
+      name: modalCurrentTrack.album || '현재 앨범',
+      coverUrl: modalCurrentTrack.coverUrl,
+    };
+    const seen = new Set();
+    return [currentAlbum, ...albums].filter(album => {
+      if (!album?.id || seen.has(album.id)) return false;
+      seen.add(album.id);
+      return true;
     });
   }
 
-  function createCarouselAlbumItem(album) {
+  function albumAtCarouselOffset(offset) {
+    const count = modalCarouselAlbums.length;
+    if (count === 0) return null;
+    const idx = (modalCarouselIndex + offset + count) % count;
+    return modalCarouselAlbums[idx];
+  }
+
+  function createCarouselAlbumItem(album, slot) {
     const el = document.createElement('div');
-    el.className = 'carousel-cover-item';
-    el.dataset.albumId = album.id;
-    el.innerHTML = buildCoverCellHtml(album.coverUrl, album.name);
-    if (!album.coverUrl) el.style.background = gradientFor(album.id);
-    attachCoverInteractions(el, { isCurrent: false, album });
+    const isCurrent = slot === 'center';
+    el.className = `carousel-cover-item carousel-cover-item--${slot}${isCurrent ? ' is-current' : ''}`;
+    if (album) {
+      el.dataset.albumId = album.id;
+      el.innerHTML = buildCoverCellHtml(album.coverUrl, album.name);
+      if (!album.coverUrl) el.style.background = gradientFor(album.id);
+      attachCoverInteractions(el, { isCurrent, album });
+    }
     return el;
+  }
+
+  function moveCarousel(direction) {
+    if (!modalCarouselExpanded || modalCarouselAlbums.length < 2) return;
+    const count = modalCarouselAlbums.length;
+    modalCarouselIndex = (modalCarouselIndex + direction + count) % count;
+    switchModalToAlbum(modalCarouselAlbums[modalCarouselIndex], { keepCarouselIndex: true });
   }
 
   /* 캐러셀 안의 커버 하나에 상호작용을 건다.
@@ -751,7 +772,13 @@
 
   /* 캐러셀에서 다른 앨범을 선택했을 때: 모달의 제목/대표곡/앨범명을 그 앨범 기준으로 교체.
      "원래 노래 제목"이 그대로면 어색하므로, 대표곡(인기도가 가장 높은 트랙)을 받아와 제목으로 사용. */
-  async function switchModalToAlbum(album) {
+  async function switchModalToAlbum(album, options = {}) {
+    if (!album?.id) return;
+    if (modalCarouselExpanded && !options.keepCarouselIndex) {
+      const idx = modalCarouselAlbums.findIndex(a => a.id === album.id);
+      if (idx > -1) modalCarouselIndex = idx;
+    }
+
     modalCurrentTrack = {
       ...modalCurrentTrack,
       albumId: album.id,
@@ -790,6 +817,36 @@
     }
   }
 
+  coverCarouselTrack.addEventListener('wheel', e => {
+    if (!modalCarouselExpanded) return;
+    e.preventDefault();
+    if (carouselWheelLocked) return;
+    const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    if (Math.abs(delta) < 12) return;
+
+    carouselWheelLocked = true;
+    moveCarousel(delta > 0 ? 1 : -1);
+    window.setTimeout(() => { carouselWheelLocked = false; }, 220);
+  }, { passive: false });
+
+  let carouselTouchX = 0;
+  let carouselTouchY = 0;
+  coverCarouselTrack.addEventListener('touchstart', e => {
+    if (!modalCarouselExpanded || e.touches.length === 0) return;
+    carouselTouchX = e.touches[0].clientX;
+    carouselTouchY = e.touches[0].clientY;
+  }, { passive: true });
+  coverCarouselTrack.addEventListener('touchmove', e => {
+    if (!modalCarouselExpanded || e.touches.length === 0) return;
+    const dx = e.touches[0].clientX - carouselTouchX;
+    const dy = e.touches[0].clientY - carouselTouchY;
+    if (Math.abs(dx) > 34 && Math.abs(dx) > Math.abs(dy)) {
+      moveCarousel(dx < 0 ? 1 : -1);
+      carouselTouchX = e.touches[0].clientX;
+      carouselTouchY = e.touches[0].clientY;
+    }
+  }, { passive: true });
+
   /* switchModalToAlbum 중간에, 캐러셀은 유지한 채로 "현재" 표시만 새 앨범으로 옮기고 싶을 때 사용.
      (캐러셀을 다시 접지 않고, 가운데 칸의 내용만 바꿔서 자연스럽게 이어지게) */
   function renderModalCoverCenterOnly(coverUrl, albumId) {
@@ -810,7 +867,7 @@
   /* ── 모달 안 커버 전용 롱프레스 감지 (카드 롱프레스와 별개 인스턴스) ── */
   function attachCoverLongPress(el, { onShortPress, onLongPress }) {
     let timer = null;
-    let startX = 0, startY = 0, triggered = false;
+    let startX = 0, startY = 0, triggered = false, cancelled = false;
 
     function clear() {
       window.clearTimeout(timer);
@@ -819,6 +876,7 @@
     }
     function start(x, y) {
       triggered = false;
+      cancelled = false;
       startX = x; startY = y;
       el.classList.add('is-pressing');
       timer = window.setTimeout(() => {
@@ -829,12 +887,15 @@
     }
     function move(x, y) {
       if (!timer) return;
-      if (Math.abs(x - startX) > COVER_MOVE_CANCEL_PX || Math.abs(y - startY) > COVER_MOVE_CANCEL_PX) clear();
+      if (Math.abs(x - startX) > COVER_MOVE_CANCEL_PX || Math.abs(y - startY) > COVER_MOVE_CANCEL_PX) {
+        cancelled = true;
+        clear();
+      }
     }
     function end() {
       const was = triggered;
       clear();
-      if (!was) onShortPress();
+      if (!was && !cancelled) onShortPress();
     }
 
     el.addEventListener('mousedown', e => start(e.clientX, e.clientY));
