@@ -27,6 +27,21 @@ const SYSTEM_PROMPT = `너는 음악 검색 도우미야. 사용자가 한국어
 - interpretation은 "#태그 #태그 분위기의 곡으로 이해했어요" 형식을 기본으로 하되,
   특정 곡/가수를 찾는 경우엔 "~를 찾고 있는 것 같아요"처럼 자연스럽게 바꿔도 돼.`;
 
+const ARTIST_ALBUMS_PROMPT = `너는 음악 데이터 정리 도우미야. 사용자가 아티스트 이름을 주면,
+그 아티스트가 발매한 것으로 널리 알려진 앨범/EP/싱글 제목 후보를 Spotify 검색에 쓰기 좋게
+정리해야 해.
+
+반드시 아래 JSON 형식으로만 응답해. 다른 설명, 코드블록 표시(\`\`\`) 없이 순수 JSON만 출력해:
+{
+  "albumNames": ["앨범 또는 싱글 제목", "최대 12개"]
+}
+
+규칙:
+- 확실하지 않은 제목은 넣지 마.
+- 같은 제목을 중복으로 넣지 마.
+- 정규 앨범을 우선하되, 알려진 EP/싱글도 포함해도 돼.
+- 아티스트 이름 자체나 설명 문장은 넣지 말고 제목만 넣어.`;
+
 /**
  * 사용자 문장을 해석해서 Spotify 검색어 + 화면 표시용 해석 문구를 만듦.
  * @param {string} userQuery - 사용자가 입력한 원문 문장
@@ -66,6 +81,48 @@ async function interpretSearchQuery(userQuery) {
 }
 
 /**
+ * Spotify의 아티스트 앨범 API가 빈 결과를 줄 때 보강용으로,
+ * Gemini가 알고 있는 앨범/EP/싱글 제목 후보를 받아온다.
+ * 실제 화면에 쓰기 전에는 Spotify 검색으로 다시 검증한다.
+ * @param {string} artistName
+ * @returns {Promise<string[]>}
+ */
+async function suggestArtistAlbumNames(artistName) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      'GEMINI_API_KEY 환경 변수가 설정되어 있지 않습니다. ' +
+      '.env 파일에 Google AI Studio에서 발급받은 키를 넣어주세요.'
+    );
+  }
+
+  const safeArtistName = String(artistName || '').trim().slice(0, 120);
+  if (!safeArtistName) return [];
+
+  const res = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      system_instruction: { parts: [{ text: ARTIST_ALBUMS_PROMPT }] },
+      contents: [{ role: 'user', parts: [{ text: safeArtistName }] }],
+      generationConfig: {
+        temperature: 0.2,
+        maxOutputTokens: 300,
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Gemini 앨범 후보 요청 실패 (status ${res.status}): ${text}`);
+  }
+
+  const data = await res.json();
+  const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  return parseGeminiAlbumNames(rawText);
+}
+
+/**
  * Gemini 응답에서 JSON을 안전하게 파싱.
  * 모델이 코드블록(```json ... ```)으로 감싸서 응답하는 경우도 있어 그 부분을 먼저 벗겨낸다.
  * 파싱이 실패하면, 검색 자체가 완전히 멈추지 않도록 사용자 원문을 그대로 검색어로 쓰는
@@ -91,4 +148,26 @@ function parseGeminiJson(rawText, fallbackQuery) {
   }
 }
 
-module.exports = { interpretSearchQuery };
+function parseGeminiAlbumNames(rawText) {
+  const cleaned = rawText.trim().replace(/^```json\s*|^```\s*|```$/g, '').trim();
+
+  try {
+    const parsed = JSON.parse(cleaned);
+    const names = Array.isArray(parsed.albumNames) ? parsed.albumNames : [];
+    const seen = new Set();
+    return names
+      .map(name => String(name || '').trim())
+      .filter(Boolean)
+      .filter(name => {
+        const key = name.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, 12);
+  } catch (err) {
+    return [];
+  }
+}
+
+module.exports = { interpretSearchQuery, suggestArtistAlbumNames };

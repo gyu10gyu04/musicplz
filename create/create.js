@@ -645,7 +645,11 @@
     if (!modalCurrentTrack?.artistId) return null;
 
     try {
-      const res = await fetch(`/api/music/artist/${encodeURIComponent(modalCurrentTrack.artistId)}/albums`, {
+      const params = new URLSearchParams();
+      const fallbackArtistName = modalCurrentTrack.primaryArtist || modalCurrentArtistName.split(',')[0].trim();
+      if (fallbackArtistName) params.set('artistName', fallbackArtistName);
+
+      const res = await fetch(`/api/music/artist/${encodeURIComponent(modalCurrentTrack.artistId)}/albums?${params}`, {
         credentials: 'same-origin',
       });
       let data = {};

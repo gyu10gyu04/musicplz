@@ -97,6 +97,7 @@ async function searchTracks(query, limit = 10) {
     id: track.id,
     title: track.name,
     artist: (track.artists || []).map(a => a.name).join(', '),
+    primaryArtist: track.artists?.[0]?.name || '',
     artistId: track.artists?.[0]?.id || null, // 모달에서 "이 가수의 다른 앨범" 조회 시 사용
     album: track.album?.name || '',
     albumId: track.album?.id || null, // 모달에서 "이 앨범의 다른 트랙" 조회 시 사용
@@ -163,6 +164,7 @@ async function getAlbumTracks(albumId, offset = 0, limit = 20) {
     id: track.id,
     title: track.name,
     artist: (track.artists || []).map(a => a.name).join(', '),
+    primaryArtist: track.artists?.[0]?.name || '',
     artistId: track.artists?.[0]?.id || null,
     album: albumName,
     albumId,
@@ -262,4 +264,81 @@ async function getArtistAlbums(artistId, offset = 0, limit = 20) {
   };
 }
 
-module.exports = { searchTracks, getAlbumTracks, getArtistAlbums };
+/**
+ * Gemini가 제안한 앨범 후보명을 Spotify 앨범 검색으로 검증합니다.
+ * Spotify에 실제로 존재하고, 아티스트명이 어느 정도 맞는 결과만 화면에 보냅니다.
+ *
+ * @param {string} artistName
+ * @param {string[]} albumNames
+ * @returns {Promise<Array>}
+ */
+async function searchAlbumsByArtistAndNames(artistName, albumNames) {
+  const cleanArtistName = String(artistName || '').trim();
+  const cleanAlbumNames = Array.isArray(albumNames)
+    ? albumNames.map(name => String(name || '').trim()).filter(Boolean)
+    : [];
+
+  if (!cleanArtistName || cleanAlbumNames.length === 0) return [];
+
+  const token = await getAccessToken();
+  const albums = [];
+  const seenIds = new Set();
+  const seenNames = new Set();
+
+  for (const albumName of cleanAlbumNames.slice(0, 12)) {
+    const query = `album:"${albumName}" artist:"${cleanArtistName}"`;
+    const url = `${SPOTIFY_SEARCH_URL}?` + new URLSearchParams({
+      q: query,
+      type: 'album',
+      limit: '5',
+      market: MARKET,
+    });
+
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) continue;
+
+    const data = await res.json();
+    const items = data?.albums?.items || [];
+    const matched = items.find(album => isLikelyAlbumMatch(album, albumName, cleanArtistName));
+
+    if (!matched || seenIds.has(matched.id)) continue;
+
+    const nameKey = normalizeText(matched.name);
+    if (seenNames.has(nameKey)) continue;
+
+    seenIds.add(matched.id);
+    seenNames.add(nameKey);
+    albums.push({
+      id: matched.id,
+      name: matched.name,
+      coverUrl: matched.images?.[1]?.url || matched.images?.[0]?.url || null,
+      releaseDate: matched.release_date || null,
+    });
+  }
+
+  return albums;
+}
+
+function isLikelyAlbumMatch(album, expectedAlbumName, expectedArtistName) {
+  if (!album?.id || !album.name) return false;
+
+  const albumName = normalizeText(album.name);
+  const expectedName = normalizeText(expectedAlbumName);
+  const albumMatches = albumName === expectedName || albumName.includes(expectedName) || expectedName.includes(albumName);
+  if (!albumMatches) return false;
+
+  const expectedArtist = normalizeText(expectedArtistName);
+  const artistNames = (album.artists || []).map(artist => normalizeText(artist.name));
+  return artistNames.some(name => name === expectedArtist || name.includes(expectedArtist) || expectedArtist.includes(name));
+}
+
+function normalizeText(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+}
+
+module.exports = { searchTracks, getAlbumTracks, getArtistAlbums, searchAlbumsByArtistAndNames };

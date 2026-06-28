@@ -8,8 +8,8 @@
 //   GET /api/music/artist/:artistId/albums  — 특정 아티스트의 다른 앨범 목록
 
 const express = require('express');
-const { interpretSearchQuery } = require('../services/gemini');
-const { searchTracks, getAlbumTracks, getArtistAlbums } = require('../services/spotify');
+const { interpretSearchQuery, suggestArtistAlbumNames } = require('../services/gemini');
+const { searchTracks, getAlbumTracks, getArtistAlbums, searchAlbumsByArtistAndNames } = require('../services/spotify');
 
 const router = express.Router();
 
@@ -94,14 +94,38 @@ router.get('/artist/:artistId/albums', async (req, res, next) => {
   try {
     const { artistId } = req.params;
     const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+    const artistName = String(req.query.artistName || '').trim().slice(0, 120);
 
-    console.log(`[아티스트 앨범 조회] artistId="${artistId}", offset=${offset}`);
+    console.log(`[아티스트 앨범 조회] artistId="${artistId}", artistName="${artistName}", offset=${offset}`);
 
     const { albums, total, hasMore } = await getArtistAlbums(artistId, offset, 30);
 
     console.log(`[아티스트 앨범 조회 결과] artistId="${artistId}" → 앨범 ${albums.length}개 (전체 ${total}개): ${albums.map(a => a.name).join(', ')}`);
 
-    res.json({ albums, total, hasMore, nextOffset: hasMore ? offset + albums.length : null });
+    if (albums.length > 0 || !artistName || offset > 0) {
+      return res.json({ albums, total, hasMore, nextOffset: hasMore ? offset + albums.length : null, source: 'spotify-artist' });
+    }
+
+    // Spotify 아티스트 앨범 API가 빈 목록을 줄 때만 Gemini로 앨범 후보명을 얻고,
+    // 그 후보를 다시 Spotify 앨범 검색으로 검증해서 실제 커버/ID가 있는 앨범만 반환한다.
+    let suggestedNames = [];
+    try {
+      suggestedNames = await suggestArtistAlbumNames(artistName);
+    } catch (geminiErr) {
+      console.error(`[Gemini 앨범 후보 실패] artistName="${artistName}":`, geminiErr.message);
+    }
+
+    const fallbackAlbums = await searchAlbumsByArtistAndNames(artistName, suggestedNames);
+
+    console.log(`[Gemini+Spotify 앨범 보강 결과] artistName="${artistName}" → 후보 ${suggestedNames.length}개, 검증 ${fallbackAlbums.length}개: ${fallbackAlbums.map(a => a.name).join(', ')}`);
+
+    res.json({
+      albums: fallbackAlbums,
+      total: fallbackAlbums.length,
+      hasMore: false,
+      nextOffset: null,
+      source: 'gemini-spotify-search',
+    });
   } catch (err) {
     console.error(`[아티스트 앨범 조회 실패] artistId="${req.params.artistId}":`, err.message);
     next(err);
