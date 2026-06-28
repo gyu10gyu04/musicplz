@@ -552,7 +552,7 @@
   let modalCarouselIndex = 0;
   let modalCarouselExpanded = false;
   let carouselAnimating = false;
-  const CAROUSEL_ANIMATION_MS = 260;
+  const CAROUSEL_ANIMATION_MS = 340;
 
   function buildCoverCellHtml(coverUrl, labelForInitials) {
     if (coverUrl) return `<img src="${coverUrl}" alt="" loading="lazy" draggable="false">`;
