@@ -551,7 +551,8 @@
   let modalCarouselAlbums = [];
   let modalCarouselIndex = 0;
   let modalCarouselExpanded = false;
-  let carouselWheelLocked = false;
+  let carouselAnimating = false;
+  const CAROUSEL_ANIMATION_MS = 260;
 
   function buildCoverCellHtml(coverUrl, labelForInitials) {
     if (coverUrl) return `<img src="${coverUrl}" alt="" loading="lazy" draggable="false">`;
@@ -748,10 +749,18 @@
   }
 
   function moveCarousel(direction) {
-    if (!modalCarouselExpanded || modalCarouselAlbums.length < 2) return;
+    if (!modalCarouselExpanded || modalCarouselAlbums.length < 2 || carouselAnimating) return;
     const count = modalCarouselAlbums.length;
-    modalCarouselIndex = (modalCarouselIndex + direction + count) % count;
-    switchModalToAlbum(modalCarouselAlbums[modalCarouselIndex], { keepCarouselIndex: true });
+    const nextIndex = (modalCarouselIndex + direction + count) % count;
+    carouselAnimating = true;
+    coverCarouselTrack.classList.add(direction > 0 ? 'is-moving-next' : 'is-moving-prev');
+
+    window.setTimeout(() => {
+      coverCarouselTrack.classList.remove('is-moving-next', 'is-moving-prev');
+      modalCarouselIndex = nextIndex;
+      switchModalToAlbum(modalCarouselAlbums[modalCarouselIndex], { keepCarouselIndex: true });
+      carouselAnimating = false;
+    }, CAROUSEL_ANIMATION_MS);
   }
 
   /* 캐러셀 안의 커버 하나에 상호작용을 건다.
@@ -766,7 +775,13 @@
         onLongPress: () => { expandArtistCarousel(); },
       });
     } else {
-      el.addEventListener('click', () => switchModalToAlbum(album));
+      el.addEventListener('click', () => {
+        const idx = modalCarouselAlbums.findIndex(a => a.id === album?.id);
+        if (idx === -1) return;
+        const count = modalCarouselAlbums.length;
+        const forward = (modalCarouselIndex + 1) % count;
+        moveCarousel(idx === forward ? 1 : -1);
+      });
     }
   }
 
@@ -820,13 +835,11 @@
   coverCarouselTrack.addEventListener('wheel', e => {
     if (!modalCarouselExpanded) return;
     e.preventDefault();
-    if (carouselWheelLocked) return;
+    if (carouselAnimating) return;
     const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
     if (Math.abs(delta) < 12) return;
 
-    carouselWheelLocked = true;
     moveCarousel(delta > 0 ? 1 : -1);
-    window.setTimeout(() => { carouselWheelLocked = false; }, 220);
   }, { passive: false });
 
   let carouselTouchX = 0;

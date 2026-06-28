@@ -456,7 +456,6 @@ nav{
   cursor:pointer;
   z-index:3;
   filter:none;
-  outline:6px solid #fff;
   box-shadow:0 18px 34px rgba(0,0,0,.18);
 }
 /* 캐러셀이 접힌 상태에선 다른 앨범 카드들을 화면 흐름에서 제거 */
@@ -495,6 +494,46 @@ nav{
 
 .cover-carousel-track.is-expanded .carousel-cover-item--right{
   transform:translateX(-8%) scale(.82);
+}
+
+.cover-carousel-track.is-expanded.is-moving-next .carousel-cover-item--left{
+  opacity:.12;
+  transform:translateX(-128%) scale(.72);
+}
+
+.cover-carousel-track.is-expanded.is-moving-next .carousel-cover-item--center{
+  opacity:.34;
+  z-index:1;
+  filter:saturate(.82) brightness(1.04);
+  transform:translateX(-92%) scale(.82);
+}
+
+.cover-carousel-track.is-expanded.is-moving-next .carousel-cover-item--right{
+  opacity:1;
+  z-index:3;
+  filter:none;
+  box-shadow:0 18px 34px rgba(0,0,0,.18);
+  transform:translateX(-50%) scale(1);
+}
+
+.cover-carousel-track.is-expanded.is-moving-prev .carousel-cover-item--left{
+  opacity:1;
+  z-index:3;
+  filter:none;
+  box-shadow:0 18px 34px rgba(0,0,0,.18);
+  transform:translateX(-50%) scale(1);
+}
+
+.cover-carousel-track.is-expanded.is-moving-prev .carousel-cover-item--center{
+  opacity:.34;
+  z-index:1;
+  filter:saturate(.82) brightness(1.04);
+  transform:translateX(-8%) scale(.82);
+}
+
+.cover-carousel-track.is-expanded.is-moving-prev .carousel-cover-item--right{
+  opacity:.12;
+  transform:translateX(28%) scale(.72);
 }
 
 .carousel-hint{
