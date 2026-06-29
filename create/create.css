@@ -425,6 +425,11 @@ nav{
 /* ── 커버 아이템 공통 ── */
 .carousel-cover-item{
   position:absolute;
+  /* 중앙 기준 정렬: top/left 50% + translate로 정중앙에 고정 */
+  top:50%;
+  left:50%;
+  margin-top:-74px;  /* height/2 */
+  margin-left:-74px; /* width/2 */
   width:148px;height:148px;
   border-radius:18px;
   display:flex;align-items:center;justify-content:center;
@@ -500,11 +505,13 @@ nav{
 }
 
 /* 기본 단일 커버 상태 */
-.cover-carousel-track:not(.is-expanded) .carousel-cover-item:not(.is-current){
+.cover-carousel-track:not(.is-expanded) .carousel-cover-item:not(.ci-single){
   display:none;
 }
-.cover-carousel-track:not(.is-expanded) .carousel-cover-item.is-current{
+.cover-carousel-track:not(.is-expanded) .carousel-cover-item.ci-single{
   position:relative;
+  top:auto;left:auto;
+  margin:0;
   transform:none;
   box-shadow:0 14px 34px rgba(0,0,0,.18);
 }
