@@ -646,82 +646,124 @@
   }
 
   /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-     5-슬롯 캐러셀
-     ll(-2) | l(-1) | c(0) | r(+1) | rr(+2)
-     드래그 중 실시간 보간으로 커버가 따라오는 효과
+     네이티브 스크롤 캐러셀
+     - CSS scroll-snap-type 으로 맥 두 손가락 / 터치 스와이프 지원
+     - 스크롤 중 가운데에 가장 가까운 아이템을 실시간으로 강조
+     - 스크롤이 멈추면(scrollend / debounce) 현재 앨범 전환
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
-  const C_SLOTS   = ['pos-ll','pos-l','pos-c','pos-r','pos-rr'];
-  const C_OFFSETS = [-2,-1,0,1,2];
-  const C_X       = [0,-88,0,88,0];      // ll/rr는 중앙(0)으로 수렴해서 사라짐
-  const C_SCALE   = [0.2,0.72,1,0.72,0.2];
-  const C_OPACITY = [0,0.52,1,0.52,0];
-  const DRAG_THRESHOLD = 38;
   const C_ANIM_MS = 320;
+  let carouselIdx      = 0;
+  let _scrollEndTimer  = null;
+  let _lastCommitIdx   = 0;  // 가장 마지막으로 switchModalToAlbum 호출한 idx
 
-  let carouselDomItems  = [];
-  let carouselIdx       = 0;
-  let carouselAnimating = false;
-  let dragStartX        = null;
-  let dragStartY        = null;
-  let isDragging        = false;
-
-  function destroyCarousel() {
-    removeDragListeners();
-    coverCarouselTrack.innerHTML = '';
-    coverCarouselTrack.classList.remove('is-expanded');
-    coverCarouselTrack.classList.remove('is-single');
-    modalCarouselExpanded = false;
-    modalCarouselAlbums   = [];
-    carouselDomItems      = [];
-    carouselIdx           = 0;
+  /* 스크롤 위치 → 앨범 인덱스 변환 */
+  function scrollToIdx(idx) {
+    /* 각 아이템 너비 = 아이템 컨테이너 너비; snap은 center 기준 */
+    const el = coverCarouselTrack.children[idx];
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
   }
 
-  function cMod(i) {
-    const N = modalCarouselAlbums.length;
-    return ((i % N) + N) % N;
+  /* 스크롤 컨테이너에서 현재 가운데에 가장 가까운 아이템 인덱스 반환 */
+  function nearestScrollIdx() {
+    const items = [...coverCarouselTrack.children];
+    if (!items.length) return 0;
+    const trackRect  = coverCarouselTrack.getBoundingClientRect();
+    const centerX    = trackRect.left + trackRect.width / 2;
+    let nearest = 0, minDist = Infinity;
+    items.forEach((el, i) => {
+      const r  = el.getBoundingClientRect();
+      const cx = r.left + r.width / 2;
+      const d  = Math.abs(cx - centerX);
+      if (d < minDist) { minDist = d; nearest = i; }
+    });
+    return nearest;
   }
 
-  function buildCarouselDom() {
-    coverCarouselTrack.innerHTML = '';
-    carouselDomItems = [];
-    for (let s = 0; s < 5; s++) {
-      const el = document.createElement('div');
-      el.className = 'carousel-cover-item ' + C_SLOTS[s];
-      el.dataset.slot = s;
-      coverCarouselTrack.appendChild(el);
-      carouselDomItems.push(el);
-    }
-  }
+  /* 스크롤 중 실시간 scale/opacity/z-index 업데이트 */
+  function updateCarouselStyles() {
+    const items    = [...coverCarouselTrack.children];
+    const trackRect = coverCarouselTrack.getBoundingClientRect();
+    const centerX   = trackRect.left + trackRect.width / 2;
+    const ITEM_W    = 148; // 아이템 가로
 
-  function fillCarouselSlots(animate) {
-    carouselDomItems.forEach((el, s) => {
-      const alb = modalCarouselAlbums[cMod(carouselIdx + C_OFFSETS[s])];
-      if (!alb) return;
-      el.innerHTML = buildCoverCellHtml(alb.coverUrl, alb.name);
-      if (!alb.coverUrl) el.style.background = gradientFor(alb.id);
-      else el.style.background = '';
-      el.dataset.albumId = alb.id;
-      el.style.transform = '';
-      el.style.opacity   = '';
-      if (!animate) {
-        el.style.transition = 'none';
-        el.className = 'carousel-cover-item ' + C_SLOTS[s];
-        requestAnimationFrame(() => { el.style.transition = ''; });
-      } else {
-        el.className = 'carousel-cover-item ' + C_SLOTS[s];
-      }
-      el.dataset.slot = s;
+    items.forEach(el => {
+      const r    = el.getBoundingClientRect();
+      const cx   = r.left + r.width / 2;
+      const dist = Math.abs(cx - centerX);
+      // 0=중앙 → 1=ITEM_W 이상 떨어짐
+      const t    = Math.min(dist / (ITEM_W * 1.1), 1);
+
+      const scale   = 1    - t * 0.28;   // 1.0 → 0.72
+      const opacity = 1    - t * 0.48;   // 1.0 → 0.52
+      const zIndex  = Math.round((1 - t) * 3);  // 3 → 0
+
+      el.style.transform = `scale(${scale.toFixed(3)})`;
+      el.style.opacity   = opacity.toFixed(3);
+      el.style.zIndex    = zIndex;
+      // 중앙 아이템에만 box-shadow
+      el.style.boxShadow = t < 0.15
+        ? '0 14px 34px rgba(0,0,0,.22)'
+        : 'none';
     });
   }
 
-  function moveCarousel(dir) {
-    if (carouselAnimating || modalCarouselAlbums.length < 2) return;
-    carouselAnimating = true;
-    carouselIdx = cMod(carouselIdx + dir);
-    fillCarouselSlots(true);
-    const alb = modalCarouselAlbums[carouselIdx];
-    if (alb && alb.id !== modalCurrentTrack?.albumId) switchModalToAlbum(alb);
-    window.setTimeout(() => { carouselAnimating = false; }, C_ANIM_MS);
+  /* 스크롤 멈춤 후 앨범 전환 커밋 */
+  function onScrollSettle() {
+    const idx = nearestScrollIdx();
+    carouselIdx = idx;
+    updateCarouselStyles();
+    if (idx !== _lastCommitIdx) {
+      _lastCommitIdx = idx;
+      const alb = modalCarouselAlbums[idx];
+      if (alb && alb.id !== modalCurrentTrack?.albumId) switchModalToAlbum(alb);
+    }
+  }
+
+  function buildScrollCarouselDom() {
+    coverCarouselTrack.innerHTML = '';
+
+    modalCarouselAlbums.forEach((alb, i) => {
+      const el = document.createElement('div');
+      el.className = 'carousel-cover-item carousel-scroll-item';
+      el.dataset.albumId = alb.id;
+      el.dataset.idx     = i;
+      el.innerHTML = buildCoverCellHtml(alb.coverUrl, alb.name);
+      if (!alb.coverUrl) el.style.background = gradientFor(alb.id);
+      coverCarouselTrack.appendChild(el);
+    });
+
+    /* 초기 스타일 적용 */
+    requestAnimationFrame(() => {
+      updateCarouselStyles();
+    });
+  }
+
+  function destroyCarousel() {
+    /* 스크롤 리스너 정리 */
+    coverCarouselTrack.removeEventListener('scroll', _onCarouselScroll);
+    coverCarouselTrack.removeEventListener('scrollend', _onCarouselScrollEnd);
+    clearTimeout(_scrollEndTimer);
+
+    coverCarouselTrack.innerHTML = '';
+    coverCarouselTrack.classList.remove('is-expanded');
+    coverCarouselTrack.classList.remove('is-single');
+    coverCarouselTrack.style.paddingInline = '';
+    modalCarouselExpanded = false;
+    modalCarouselAlbums   = [];
+    carouselIdx           = 0;
+    _lastCommitIdx        = 0;
+  }
+
+  function _onCarouselScroll() {
+    updateCarouselStyles();
+    /* scrollend 미지원 브라우저 대비 debounce */
+    clearTimeout(_scrollEndTimer);
+    _scrollEndTimer = setTimeout(onScrollSettle, 120);
+  }
+  function _onCarouselScrollEnd() {
+    clearTimeout(_scrollEndTimer);
+    onScrollSettle();
   }
 
   async function expandArtistCarousel() {
@@ -744,118 +786,36 @@
       seen.add(a.id); return true;
     });
 
-    carouselIdx = 0;
+    carouselIdx    = 0;
+    _lastCommitIdx = 0;
     coverCarouselTrack.classList.remove('is-single');
     coverCarouselTrack.classList.add('is-expanded');
     modalCarouselExpanded = true;
     trackModal.classList.add('is-carousel-open');
     carouselHint.hidden = false;
-    carouselHint.textContent = '← 드래그해서 다른 앨범 보기 →';
+    carouselHint.textContent = '← 스크롤해서 다른 앨범 보기 →';
     carouselHint.classList.remove('is-notice');
 
-    buildCarouselDom();
-    fillCarouselSlots(false);
-    attachDragListeners();
-  }
+    buildScrollCarouselDom();
 
-  /* ── 드래그 실시간 보간 ── */
-  /* ── 드래그 상태 ──
-     touchstart에서는 수평/수직 판단이 불가능 → passive:true 로 시작
-     touchmove에서 수평 이동이 확인되면 그때부터 preventDefault
-     → 수직 스크롤은 자연스럽게 허용, 수평 스크롤은 캐러셀이 가로챔
-  ── */
-  let _dragLocked = false;  // 수평 확정 후 true → preventDefault 허용
+    /* 스크롤 이벤트 연결 */
+    coverCarouselTrack.addEventListener('scroll', _onCarouselScroll, { passive: true });
+    coverCarouselTrack.addEventListener('scrollend', _onCarouselScrollEnd, { passive: true });
 
-  function onDragStart(x, y) {
-    dragStartX = x; dragStartY = y; isDragging = false; _dragLocked = false;
-  }
-
-  function onDragMove(x, y) {
-    if (dragStartX === null) return;
-    const dx = x - dragStartX;
-    const dy = y - dragStartY;
-
-    if (!_dragLocked) {
-      // 첫 이동: 수직이 더 크면 페이지 스크롤로 넘기고 드래그 취소
-      if (Math.abs(dy) > Math.abs(dx) + 4) {
-        dragStartX = null; return;
-      }
-      // 수평이 4px 이상이면 캐러셀 드래그로 확정
-      if (Math.abs(dx) > 4) _dragLocked = true;
-      else return;
-    }
-
-    isDragging = true;
-    if (carouselAnimating) return;
-
-    const ratio = Math.min(Math.abs(dx) / DRAG_THRESHOLD, 1);
-    const dir   = dx < 0 ? 1 : -1;
-
-    carouselDomItems.forEach((el, s) => {
-      const nextS = ((s + dir) % 5 + 5) % 5;
-      const tx = C_X[s]      + (C_X[nextS]      - C_X[s])      * ratio;
-      const sc = C_SCALE[s]  + (C_SCALE[nextS]  - C_SCALE[s])  * ratio;
-      const op = C_OPACITY[s]+ (C_OPACITY[nextS] - C_OPACITY[s])* ratio;
-      el.style.transition = 'none';
-      el.style.transform  = `translateX(${tx}px) scale(${sc})`;
-      el.style.opacity    = op;
+    /* 양쪽 padding 설정: 첫/마지막 아이템도 정가운데로 스냅되도록
+       trackWidth / 2 - itemWidth / 2 */
+    requestAnimationFrame(() => {
+      const trackW = coverCarouselTrack.offsetWidth;
+      const itemW  = 148;
+      const pad    = Math.max(0, Math.floor((trackW - itemW) / 2));
+      coverCarouselTrack.style.paddingInline = `${pad}px`;
+      /* 현재 앨범(첫 번째)으로 즉시 스크롤 → 이후에 위치 계산 */
+      const first = coverCarouselTrack.children[0];
+      if (first) first.scrollIntoView({ behavior: 'instant', block: 'nearest', inline: 'center' });
+      /* scrollIntoView(instant)는 동기적으로 즉시 적용되므로
+         바로 뒤에서 호출하면 올바른 위치 기준으로 opacity/scale 계산 가능 */
+      updateCarouselStyles();
     });
-  }
-
-  function onDragEnd(x, targetEl) {
-    if (dragStartX === null) return;
-    const dx = x - dragStartX;
-    const wasDragging = isDragging;
-    dragStartX = null; dragStartY = null; isDragging = false; _dragLocked = false;
-    carouselDomItems.forEach(el => {
-      el.style.transition = '';
-      el.style.transform  = '';
-      el.style.opacity    = '';
-    });
-    if (Math.abs(dx) >= DRAG_THRESHOLD && wasDragging) {
-      // 드래그 이동 충분 → 쳠러셀 슬라이드
-      moveCarousel(dx < 0 ? 1 : -1);
-    } else if (!carouselAnimating && targetEl) {
-      // 드래그 없는 짧은 클릭 → 사이드 커버 선택
-      const el = targetEl.closest('.carousel-cover-item');
-      if (el) {
-        const s = parseInt(el.dataset.slot);
-        if (s === 1) moveCarousel(-1);
-        else if (s === 3) moveCarousel(1);
-      }
-    }
-  }
-
-  function _onMouseMove(e) { onDragMove(e.clientX, e.clientY); }
-  function _onMouseUp(e)   { onDragEnd(e.clientX, e.target); }
-
-  // touchmove: passive:false 로 등록해야 수평 확정 후 preventDefault 가능
-  function _onTouchMove(e) {
-    const t = e.touches[0];
-    if (_dragLocked) e.preventDefault();  // 수평 확정 → 페이지 스크롤 차단
-    onDragMove(t.clientX, t.clientY);
-  }
-  function _onTouchEnd(e) { const t = e.changedTouches[0]; onDragEnd(t.clientX, document.elementFromPoint(t.clientX, t.clientY)); }
-
-  function attachDragListeners() {
-    coverCarouselTrack.addEventListener('mousedown', e => { e.preventDefault(); onDragStart(e.clientX, e.clientY); });
-    window.addEventListener('mousemove', _onMouseMove);
-    window.addEventListener('mouseup',   _onMouseUp);
-
-    // touchstart: passive:true (스크롤 가능하도록)
-    coverCarouselTrack.addEventListener('touchstart', e => {
-      const t = e.touches[0]; onDragStart(t.clientX, t.clientY);
-    }, { passive: true });
-
-    // touchmove: passive:false (수평 확정 시 preventDefault 가능하도록)
-    coverCarouselTrack.addEventListener('touchmove', _onTouchMove, { passive: false });
-    coverCarouselTrack.addEventListener('touchend',  _onTouchEnd,  { passive: true });
-    // click 이벤트는 mousedown의 preventDefault 때문에 발생하지 않으므로 제거
-  }
-
-  function removeDragListeners() {
-    window.removeEventListener('mousemove', _onMouseMove);
-    window.removeEventListener('mouseup',   _onMouseUp);
   }
 
   async function switchModalToAlbum(album) {
