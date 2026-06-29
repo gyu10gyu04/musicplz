@@ -575,6 +575,9 @@
     }, 250);
   }
 
+  let draggedIdx = null;
+  let targetIdx = null;
+
   function renderSelectedTracksList() {
     selectedTracksModalList.innerHTML = '';
     if (selectedOrder.length === 0) {
@@ -582,12 +585,14 @@
       return;
     }
 
-    selectedOrder.forEach(id => {
+    selectedOrder.forEach((id, i) => {
       const track = trackById(id);
       if (!track) return;
 
       const item = document.createElement('div');
       item.className = 'selected-track-item';
+      item.draggable = true;
+      item.dataset.index = i;
 
       const coverInner = track.coverUrl
         ? `<img src="${track.coverUrl}" alt="" loading="lazy" draggable="false">`
@@ -608,6 +613,32 @@
         </button>
       `;
 
+      // 드래그앤드롭 이벤트 리스너
+      item.addEventListener('dragstart', (e) => {
+        draggedIdx = i;
+        item.classList.add('is-dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        selectedTracksModalList.classList.add('is-sorting');
+      });
+
+      item.addEventListener('dragend', () => {
+        item.classList.remove('is-dragging');
+        selectedTracksModalList.classList.remove('is-sorting');
+
+        // 모든 변형 속성 초기화
+        const children = [...selectedTracksModalList.children];
+        children.forEach(child => child.style.transform = '');
+
+        if (targetIdx !== null && targetIdx !== draggedIdx) {
+          const [removed] = selectedOrder.splice(draggedIdx, 1);
+          selectedOrder.splice(targetIdx, 0, removed);
+          renderSelectedTracksList();
+          renderTray();
+        }
+        draggedIdx = null;
+        targetIdx = null;
+      });
+
       item.querySelector('.selected-track-remove').addEventListener('click', (e) => {
         e.stopPropagation();
         toggleTrack(track);
@@ -615,6 +646,47 @@
       });
 
       selectedTracksModalList.appendChild(item);
+    });
+
+    // 벌어지는 애니메이션 처리를 위한 컨테이너 드래그오버 리스너 (레이아웃 고정형 offsetTop 기반)
+    selectedTracksModalList.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (draggedIdx === null) return;
+
+      const children = [...selectedTracksModalList.children];
+      const containerRect = selectedTracksModalList.getBoundingClientRect();
+      const relativeY = e.clientY - containerRect.top + selectedTracksModalList.scrollTop;
+
+      let tempTarget = draggedIdx;
+      let minDist = Infinity;
+
+      // offsetTop은 transform: translateY의 영향을 받지 않는 절대 위치이므로 계산에 완벽한 무결성을 지닙니다.
+      children.forEach((child, k) => {
+        const childMidY = child.offsetTop + child.offsetHeight / 2;
+        const d = Math.abs(relativeY - childMidY);
+        if (d < minDist) {
+          minDist = d;
+          tempTarget = k;
+        }
+      });
+
+      targetIdx = tempTarget;
+
+      // 드래그 위치에 맞추어 카드들이 벌어지는 느낌의 CSS Transform 동적 계산 적용
+      children.forEach((child, k) => {
+        if (k === draggedIdx) return;
+        child.style.transform = '';
+
+        if (draggedIdx < targetIdx) {
+          if (k > draggedIdx && k <= targetIdx) {
+            child.style.transform = 'translateY(-82px)'; // Item height 70px + gap 12px
+          }
+        } else if (draggedIdx > targetIdx) {
+          if (k >= targetIdx && k < draggedIdx) {
+            child.style.transform = 'translateY(82px)';
+          }
+        }
+      });
     });
   }
 
@@ -734,6 +806,74 @@
   let _lastCommitIdx   = 0;  // 가장 마지막으로 switchModalToAlbum 호출한 idx
   let scrollTicking    = false;
 
+  // 마우스 드래그 및 관성 스크롤(미끄러짐)용 변수
+  let isMouseDown = false;
+  let dragStartX = 0;
+  let dragScrollLeft = 0;
+  let dragVelocity = 0;
+  let dragLastX = 0;
+  let dragLastTime = 0;
+  let inertiaAnimFrameId = null;
+
+  function onMouseDown(e) {
+    if (e.button !== 0) return;
+    isMouseDown = true;
+    coverCarouselTrack.classList.add('is-dragging');
+    coverCarouselTrack.style.scrollSnapType = 'none';
+    dragStartX = e.pageX - coverCarouselTrack.offsetLeft;
+    dragScrollLeft = coverCarouselTrack.scrollLeft;
+    dragVelocity = 0;
+    dragLastX = e.pageX;
+    dragLastTime = Date.now();
+    cancelAnimationFrame(inertiaAnimFrameId);
+  }
+
+  function onMouseMove(e) {
+    if (!isMouseDown) return;
+    e.preventDefault();
+    const x = e.pageX - coverCarouselTrack.offsetLeft;
+    const walk = (x - dragStartX) * 1.3;
+    coverCarouselTrack.scrollLeft = dragScrollLeft - walk;
+
+    const now = Date.now();
+    const elapsed = now - dragLastTime;
+    if (elapsed > 0) {
+      dragVelocity = (e.pageX - dragLastX) / elapsed;
+      dragLastX = e.pageX;
+      dragLastTime = now;
+    }
+  }
+
+  function onMouseUpOrLeave() {
+    if (!isMouseDown) return;
+    isMouseDown = false;
+    coverCarouselTrack.classList.remove('is-dragging');
+    applyInertia();
+  }
+
+  function applyInertia() {
+    if (Math.abs(dragVelocity) < 0.1) {
+      coverCarouselTrack.style.scrollSnapType = 'x mandatory';
+      onScrollSettle();
+      return;
+    }
+
+    const step = () => {
+      if (isMouseDown) return;
+      coverCarouselTrack.scrollLeft -= dragVelocity * 16;
+      dragVelocity *= 0.92; // 마찰력
+
+      if (Math.abs(dragVelocity) > 0.08) {
+        inertiaAnimFrameId = requestAnimationFrame(step);
+      } else {
+        coverCarouselTrack.style.scrollSnapType = 'x mandatory';
+        const idx = nearestScrollIdx();
+        scrollToIdx(idx);
+      }
+    };
+    inertiaAnimFrameId = requestAnimationFrame(step);
+  }
+
   /* 스크롤 위치 → 앨범 인덱스 변환 */
   function scrollToIdx(idx) {
     /* 각 아이템 너비 = 아이템 컨테이너 너비; snap은 center 기준 */
@@ -839,10 +979,18 @@
   }
 
   function destroyCarousel() {
-    /* 스크롤 리스너 정리 */
+    /* 스크롤 및 드래그 리스너 정리 */
     coverCarouselTrack.removeEventListener('scroll', _onCarouselScroll);
     coverCarouselTrack.removeEventListener('scrollend', _onCarouselScrollEnd);
     clearTimeout(_scrollEndTimer);
+
+    coverCarouselTrack.removeEventListener('mousedown', onMouseDown);
+    window.removeEventListener('mousemove', onMouseMove);
+    window.removeEventListener('mouseup', onMouseUpOrLeave);
+    cancelAnimationFrame(inertiaAnimFrameId);
+    isMouseDown = false;
+    coverCarouselTrack.classList.remove('is-dragging');
+    coverCarouselTrack.style.scrollSnapType = '';
 
     coverCarouselTrack.innerHTML = '';
     coverCarouselTrack.classList.remove('is-expanded');
@@ -904,9 +1052,13 @@
 
     buildScrollCarouselDom();
 
-    /* 스크롤 이벤트 연결 */
+    /* 스크롤 및 마우스 드래그 이벤트 연결 */
     coverCarouselTrack.addEventListener('scroll', _onCarouselScroll, { passive: true });
     coverCarouselTrack.addEventListener('scrollend', _onCarouselScrollEnd, { passive: true });
+
+    coverCarouselTrack.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUpOrLeave);
 
     /* 양쪽 padding 설정: 첫/마지막 아이템도 정가운데로 스냅되도록
        trackWidth / 2 - itemWidth / 2 */

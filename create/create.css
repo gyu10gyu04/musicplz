@@ -659,11 +659,24 @@ nav{
   background: #f8f6fc;
   border-radius: 16px;
   border: 1px solid #eee8f8;
-  transition: background 0.15s, transform 0.15s;
+  cursor: grab;
+  /* 카드 정렬 벌어질 때 매끄러운 애니메이션 효과 */
+  transition: background 0.15s, transform 0.28s cubic-bezier(0.2, 1, 0.2, 1), box-shadow 0.2s ease;
+  user-select: none;
 }
-.selected-track-item:hover {
+.selected-track-item:active {
+  cursor: grabbing;
+}
+.selected-track-item.is-dragging {
+  opacity: 0.35;
+  background: #f1ecf9;
+  border: 1px dashed #7c3aed;
+  box-shadow: none;
+}
+.selected-track-item:hover:not(.is-dragging) {
   background: #f1ecf9;
   transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.08);
 }
 
 .selected-track-cover {
