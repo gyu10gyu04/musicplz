@@ -802,22 +802,32 @@
     });
   }
 
-  function onDragEnd(x) {
+  function onDragEnd(x, targetEl) {
     if (dragStartX === null) return;
     const dx = x - dragStartX;
+    const wasDragging = isDragging;
+    dragStartX = null; dragStartY = null; isDragging = false; _dragLocked = false;
     carouselDomItems.forEach(el => {
       el.style.transition = '';
       el.style.transform  = '';
       el.style.opacity    = '';
     });
-    if (Math.abs(dx) >= DRAG_THRESHOLD && isDragging) {
+    if (Math.abs(dx) >= DRAG_THRESHOLD && wasDragging) {
+      // 드래그 이동 충분 → 쳠러셀 슬라이드
       moveCarousel(dx < 0 ? 1 : -1);
+    } else if (!carouselAnimating && targetEl) {
+      // 드래그 없는 짧은 클릭 → 사이드 커버 선택
+      const el = targetEl.closest('.carousel-cover-item');
+      if (el) {
+        const s = parseInt(el.dataset.slot);
+        if (s === 1) moveCarousel(-1);
+        else if (s === 3) moveCarousel(1);
+      }
     }
-    dragStartX = null; dragStartY = null; isDragging = false; _dragLocked = false;
   }
 
   function _onMouseMove(e) { onDragMove(e.clientX, e.clientY); }
-  function _onMouseUp(e)   { onDragEnd(e.clientX); }
+  function _onMouseUp(e)   { onDragEnd(e.clientX, e.target); }
 
   // touchmove: passive:false 로 등록해야 수평 확정 후 preventDefault 가능
   function _onTouchMove(e) {
@@ -825,7 +835,7 @@
     if (_dragLocked) e.preventDefault();  // 수평 확정 → 페이지 스크롤 차단
     onDragMove(t.clientX, t.clientY);
   }
-  function _onTouchEnd(e) { const t = e.changedTouches[0]; onDragEnd(t.clientX); }
+  function _onTouchEnd(e) { const t = e.changedTouches[0]; onDragEnd(t.clientX, document.elementFromPoint(t.clientX, t.clientY)); }
 
   function attachDragListeners() {
     coverCarouselTrack.addEventListener('mousedown', e => { e.preventDefault(); onDragStart(e.clientX, e.clientY); });
@@ -840,15 +850,7 @@
     // touchmove: passive:false (수평 확정 시 preventDefault 가능하도록)
     coverCarouselTrack.addEventListener('touchmove', _onTouchMove, { passive: false });
     coverCarouselTrack.addEventListener('touchend',  _onTouchEnd,  { passive: true });
-
-    // 사이드 커버 클릭
-    coverCarouselTrack.addEventListener('click', e => {
-      const el = e.target.closest('.carousel-cover-item');
-      if (!el || carouselAnimating || isDragging) return;
-      const s = parseInt(el.dataset.slot);
-      if (s === 1) moveCarousel(-1);
-      else if (s === 3) moveCarousel(1);
-    });
+    // click 이벤트는 mousedown의 preventDefault 때문에 발생하지 않으므로 제거
   }
 
   function removeDragListeners() {
