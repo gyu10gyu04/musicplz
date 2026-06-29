@@ -510,7 +510,11 @@
     if (count > MAX_CHIPS) {
       const more = document.createElement('div');
       more.className = 'tray-chip-more';
+      more.style.cursor = 'pointer';
       more.textContent = `+${count - MAX_CHIPS}`;
+      more.addEventListener('click', () => {
+        openSelectedTracksModal();
+      });
       trayStrip.appendChild(more);
     }
   }
@@ -548,6 +552,79 @@
   let modalArtistAlbums      = null;   // 서버에서 받아온 앨범 목록 캐시
   let modalCarouselAlbums    = [];     // 실제 캐러셀에 쓰이는 배열 (현재 앨범 포함)
   let modalCarouselExpanded  = false;
+
+  /* ── 담은 곡 목록 모달 관련 선택자 및 제어 함수 ── */
+  const selectedTracksModalBackdrop = document.getElementById('selectedTracksModalBackdrop');
+  const selectedTracksModalClose    = document.getElementById('selectedTracksModalClose');
+  const selectedTracksModalList     = document.getElementById('selectedTracksModalList');
+
+  function openSelectedTracksModal() {
+    renderSelectedTracksList();
+    selectedTracksModalBackdrop.hidden = false;
+    requestAnimationFrame(() => {
+      selectedTracksModalBackdrop.classList.add('is-open');
+    });
+  }
+
+  function closeSelectedTracksModal() {
+    selectedTracksModalBackdrop.classList.remove('is-open');
+    setTimeout(() => {
+      if (!selectedTracksModalBackdrop.classList.contains('is-open')) {
+        selectedTracksModalBackdrop.hidden = true;
+      }
+    }, 250);
+  }
+
+  function renderSelectedTracksList() {
+    selectedTracksModalList.innerHTML = '';
+    if (selectedOrder.length === 0) {
+      selectedTracksModalList.innerHTML = '<div style="text-align:center;color:rgba(0,0,0,0.4);padding:40px 0;">담은 곡이 없습니다.</div>';
+      return;
+    }
+
+    selectedOrder.forEach(id => {
+      const track = trackById(id);
+      if (!track) return;
+
+      const item = document.createElement('div');
+      item.className = 'selected-track-item';
+
+      const coverInner = track.coverUrl
+        ? `<img src="${track.coverUrl}" alt="" loading="lazy" draggable="false">`
+        : initials(track.artist);
+      const coverStyle = track.coverUrl ? '' : `style="background:${gradientFor(track.id)}"`;
+
+      item.innerHTML = `
+        <div class="selected-track-cover" ${coverStyle}>${coverInner}</div>
+        <div class="selected-track-info">
+          <div class="selected-track-title">${track.title}</div>
+          <div class="selected-track-artist">${track.artist}</div>
+        </div>
+        <button type="button" class="selected-track-remove" aria-label="삭제">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      `;
+
+      item.querySelector('.selected-track-remove').addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleTrack(track);
+        renderSelectedTracksList();
+      });
+
+      selectedTracksModalList.appendChild(item);
+    });
+  }
+
+  selectedTracksModalClose.addEventListener('click', closeSelectedTracksModal);
+  selectedTracksModalBackdrop.addEventListener('click', (e) => {
+    if (e.target === selectedTracksModalBackdrop) closeSelectedTracksModal();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !selectedTracksModalBackdrop.hidden) closeSelectedTracksModal();
+  });
 
   /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
      커버 HTML 헬퍼
@@ -655,6 +732,7 @@
   let carouselIdx      = 0;
   let _scrollEndTimer  = null;
   let _lastCommitIdx   = 0;  // 가장 마지막으로 switchModalToAlbum 호출한 idx
+  let scrollTicking    = false;
 
   /* 스크롤 위치 → 앨범 인덱스 변환 */
   function scrollToIdx(idx) {
@@ -774,10 +852,17 @@
     modalCarouselAlbums   = [];
     carouselIdx           = 0;
     _lastCommitIdx        = 0;
+    scrollTicking         = false;
   }
 
   function _onCarouselScroll() {
-    updateCarouselStyles();
+    if (!scrollTicking) {
+      requestAnimationFrame(() => {
+        updateCarouselStyles();
+        scrollTicking = false;
+      });
+      scrollTicking = true;
+    }
     /* scrollend 미지원 브라우저 대비 debounce */
     clearTimeout(_scrollEndTimer);
     _scrollEndTimer = setTimeout(onScrollSettle, 120);

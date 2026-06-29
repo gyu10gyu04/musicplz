@@ -142,6 +142,21 @@
     </div>
   </div>
 
+  <!-- ─── 담은 곡 목록 모달 (트레이의 +버튼 클릭 시 표시) ─── -->
+  <div class="selected-tracks-modal-backdrop" id="selectedTracksModalBackdrop" hidden>
+    <div class="selected-tracks-modal" id="selectedTracksModal" role="dialog" aria-modal="true" aria-labelledby="selectedModalTitle">
+      <button type="button" class="selected-tracks-modal-close" id="selectedTracksModalClose" aria-label="닫기">
+        <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+      <div class="selected-tracks-modal-header">
+        <h3 id="selectedModalTitle">담은 곡 목록</h3>
+      </div>
+      <div class="selected-tracks-modal-list" id="selectedTracksModalList">
+        <!-- JS가 선택된 곡 카드를 여기에 렌더링 -->
+      </div>
+    </div>
+  </div>
+
   <!-- 페이지 전환 웨이브 오버레이 (main.js / login.js와 동일 사양, 화면을 덮은 상태로 시작) -->
   <svg class="wave-transition" id="waveTransition" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
     <path id="wavePath" d="M0,100 L0,0 C25,0 75,0 100,0 L100,100 Z"></path>
