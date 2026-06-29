@@ -177,17 +177,17 @@ nav{
 
 .results-grid{
   display:grid;
-  grid-template-columns:repeat(2,1fr);
-  gap:14px;
+  grid-template-columns:1fr;
+  gap:12px;
 }
 
 /* 스켈레톤 로딩 */
 .loading-rows{
-  display:grid;grid-template-columns:repeat(2,1fr);gap:14px;
+  display:grid;grid-template-columns:1fr;gap:12px;
   width:100%;
 }
 .skeleton-card{
-  height:88px;border-radius:16px;
+  height:76px;border-radius:16px;
   background:linear-gradient(100deg,#f3f1f7 30%,#ebe8f2 50%,#f3f1f7 70%);
   background-size:200% 100%;
   animation:shimmer 1.3s ease-in-out infinite;
@@ -660,19 +660,30 @@ nav{
   border-radius: 16px;
   border: 1px solid #eee8f8;
   cursor: grab;
-  /* 카드 정렬 벌어질 때 매끄러운 애니메이션 효과 */
-  transition: background 0.15s, transform 0.28s cubic-bezier(0.2, 1, 0.2, 1), box-shadow 0.2s ease;
+  transition: background 0.15s, transform 0.28s cubic-bezier(0.2, 1, 0.2, 1), box-shadow 0.2s ease, opacity 0.2s ease, filter 0.2s ease;
   user-select: none;
 }
 .selected-track-item:active {
   cursor: grabbing;
 }
+
+/* 드래그 중인 카드: 진하고 선명하게 + 그림자로 떠 있는 느낌 */
 .selected-track-item.is-dragging {
-  opacity: 0.35;
-  background: #f1ecf9;
-  border: 1px dashed #7c3aed;
-  box-shadow: none;
+  opacity: 1 !important;
+  background: #fff;
+  border: 1.5px solid #7c3aed;
+  box-shadow: 0 12px 36px rgba(124, 58, 237, 0.28), 0 4px 12px rgba(0,0,0,0.12);
+  filter: none !important;
+  z-index: 10;
 }
+
+/* 드래그 중일 때 나머지 카드들: 유리처럼 흐릿하게 비치는 효과 */
+.selected-tracks-modal-list.is-sorting .selected-track-item:not(.is-dragging) {
+  opacity: 0.55;
+  filter: blur(0.6px) brightness(0.97);
+  background: rgba(248, 246, 252, 0.6);
+}
+
 .selected-track-item:hover:not(.is-dragging) {
   background: #f1ecf9;
   transform: translateY(-1px);
