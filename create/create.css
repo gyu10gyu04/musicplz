@@ -274,10 +274,18 @@ nav{
 /* ── 하단 고정 트레이 ── */
 .tray{
   position:fixed;left:0;right:0;bottom:0;z-index:900;
-  background:rgba(255,255,255,.88);
-  backdrop-filter:blur(14px);
-  border-top:1px solid rgba(0,0,0,.06);
-  box-shadow:0 -8px 30px rgba(0,0,0,.05);
+
+  /* 상단 nav와 동일한 유리 질감 */
+  background:rgba(253,251,255,.62);
+  backdrop-filter:blur(20px) saturate(1.6);
+  -webkit-backdrop-filter:blur(20px) saturate(1.6);
+
+  /* 상단 경계선: 흰 하이라이트 + 연한 보라 */
+  border-top:1px solid rgba(255,255,255,.7);
+  box-shadow:
+    0 -1px 0 rgba(124,58,237,.08),
+    0 -12px 40px rgba(10,8,20,.06);
+
   transform:translateY(100%);
   transition:transform .32s cubic-bezier(.22,1,.36,1);
 }
