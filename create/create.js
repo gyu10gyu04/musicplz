@@ -664,33 +664,30 @@
     el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
   }
 
-  /* 스크롤 컨테이너에서 현재 가운데에 가장 가까운 아이템 인덱스 반환 */
+  /* 스크롤 컨테이너에서 현재 가운데에 가장 가까운 아이템 인덱스 반환 (레이아웃 비의존형) */
   function nearestScrollIdx() {
     const items = [...coverCarouselTrack.children];
     if (!items.length) return 0;
-    const trackRect  = coverCarouselTrack.getBoundingClientRect();
-    const centerX    = trackRect.left + trackRect.width / 2;
+    const trackCenter = coverCarouselTrack.scrollLeft + coverCarouselTrack.clientWidth / 2;
     let nearest = 0, minDist = Infinity;
     items.forEach((el, i) => {
-      const r  = el.getBoundingClientRect();
-      const cx = r.left + r.width / 2;
-      const d  = Math.abs(cx - centerX);
+      const itemCenter = el.offsetLeft + el.offsetWidth / 2;
+      const d = Math.abs(itemCenter - trackCenter);
       if (d < minDist) { minDist = d; nearest = i; }
     });
     return nearest;
   }
 
-  /* 스크롤 중 실시간 scale/opacity/z-index 업데이트 (원통형, 정면 시야) */
+  /* 스크롤 중 실시간 scale/opacity/z-index 업데이트 (원통형, 정면 시야 - 레이아웃 비의존형) */
   function updateCarouselStyles() {
-    const items    = [...coverCarouselTrack.children];
-    const trackRect = coverCarouselTrack.getBoundingClientRect();
-    const centerX   = trackRect.left + trackRect.width / 2;
-    const ITEM_W    = 148; // 아이템 가로
+    const items = [...coverCarouselTrack.children];
+    if (!items.length) return;
+    const trackCenter = coverCarouselTrack.scrollLeft + coverCarouselTrack.clientWidth / 2;
+    const ITEM_W = 148; // 아이템 가로
 
     items.forEach(el => {
-      const r    = el.getBoundingClientRect();
-      const cx   = r.left + r.width / 2;
-      const dist = Math.abs(cx - centerX);
+      const itemCenter = el.offsetLeft + el.offsetWidth / 2;
+      const dist = Math.abs(itemCenter - trackCenter);
       
       // t: 중앙(0)에서 멀어질수록 증가
       const t = Math.min(dist / (ITEM_W * 1.2), 1.8);
@@ -699,7 +696,7 @@
       const translateZ = -t * 110; 
       
       // 스크롤되면서 바깥쪽이 아닌 안쪽(중앙 방향)으로 꺾여 사라지는 원통 느낌을 주기 위한 X축 보정
-      const direction = cx > centerX ? -1 : 1;
+      const direction = itemCenter > trackCenter ? -1 : 1;
       const translateX = direction * (t * t * 24);
 
       // scale도 살짝 줄여줌 (translateZ로 이미 작아지므로 보조적인 효과만)
