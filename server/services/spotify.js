@@ -21,6 +21,11 @@ const MARKET = 'KR';
 let cachedToken = null;
 let tokenExpiresAt = 0; // epoch ms
 
+// Spotify API rate limit (429) 방지를 위한 간단한 인메모리 캐시
+const albumTracksCache = new Map();
+const artistAlbumsCache = new Map();
+const CACHE_TTL = 10 * 60 * 1000; // 10분 캐시 유지
+
 async function getAccessToken() {
   const now = Date.now();
 
@@ -122,11 +127,18 @@ async function searchTracks(query, limit = 10) {
 async function getAlbumTracks(albumId, offset = 0, limit = 20) {
   if (!albumId) throw new Error('albumId가 필요합니다.');
 
-  const token = await getAccessToken();
   const parsedLimit = parseInt(limit, 10);
   const cappedLimit = isNaN(parsedLimit) ? 20 : Math.min(Math.max(parsedLimit, 1), 50);
   const parsedOffset = parseInt(offset, 10);
   const safeOffset = isNaN(parsedOffset) ? 0 : Math.max(parsedOffset, 0);
+
+  const cacheKey = `${albumId}:${safeOffset}:${cappedLimit}`;
+  const cached = albumTracksCache.get(cacheKey);
+  if (cached && Date.now() < cached.expiresAt) {
+    return cached.data;
+  }
+
+  const token = await getAccessToken();
 
   // 1) 앨범 기본 정보(이름, 커버, 아티스트) 조회
   const albumRes = await fetch(`${SPOTIFY_API_BASE}/albums/${albumId}?market=${MARKET}`, {
@@ -175,7 +187,7 @@ async function getAlbumTracks(albumId, offset = 0, limit = 20) {
     popularity: popularityMap.get(track.id) ?? 0,
   }));
 
-  return {
+  const result = {
     tracks,
     total: tracksData.total ?? items.length,
     hasMore: Boolean(tracksData.next),
@@ -187,6 +199,9 @@ async function getAlbumTracks(albumId, offset = 0, limit = 20) {
       artistId: albumData.artists?.[0]?.id || null,
     },
   };
+
+  albumTracksCache.set(cacheKey, { data: result, expiresAt: Date.now() + CACHE_TTL });
+  return result;
 }
 
 /**
@@ -220,11 +235,18 @@ async function fetchTrackPopularities(trackIds, token) {
 async function getArtistAlbums(artistId, offset = 0, limit = 10) {
   if (!artistId) throw new Error('artistId가 필요합니다.');
 
-  const token = await getAccessToken();
   const parsedLimit = parseInt(limit, 10);
   const cappedLimit = isNaN(parsedLimit) ? 10 : Math.min(Math.max(parsedLimit, 1), 10);
   const parsedOffset = parseInt(offset, 10);
   const safeOffset = isNaN(parsedOffset) ? 0 : Math.max(parsedOffset, 0);
+
+  const cacheKey = `${artistId}:${safeOffset}:${cappedLimit}`;
+  const cached = artistAlbumsCache.get(cacheKey);
+  if (cached && Date.now() < cached.expiresAt) {
+    return cached.data;
+  }
+
+  const token = await getAccessToken();
 
   const url = `${SPOTIFY_API_BASE}/artists/${artistId}/albums?` + new URLSearchParams({
     offset: String(safeOffset),
@@ -257,11 +279,14 @@ async function getArtistAlbums(artistId, offset = 0, limit = 10) {
     });
   }
 
-  return {
+  const result = {
     albums,
     total: data.total ?? items.length,
     hasMore: Boolean(data.next),
   };
+
+  artistAlbumsCache.set(cacheKey, { data: result, expiresAt: Date.now() + CACHE_TTL });
+  return result;
 }
 
 /**

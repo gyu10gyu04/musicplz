@@ -425,6 +425,8 @@ nav{
   box-sizing:border-box;
   gap:24px;
   cursor:default;
+  perspective:800px;
+  transform-style:preserve-3d;
 }
 .cover-carousel-track.is-expanded::-webkit-scrollbar{
   display:none;

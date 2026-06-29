@@ -680,7 +680,7 @@
     return nearest;
   }
 
-  /* 스크롤 중 실시간 scale/opacity/z-index 업데이트 */
+  /* 스크롤 중 실시간 scale/opacity/z-index 업데이트 (원통형, 정면 시야) */
   function updateCarouselStyles() {
     const items    = [...coverCarouselTrack.children];
     const trackRect = coverCarouselTrack.getBoundingClientRect();
@@ -691,20 +691,33 @@
       const r    = el.getBoundingClientRect();
       const cx   = r.left + r.width / 2;
       const dist = Math.abs(cx - centerX);
-      // 0=중앙 → 1=ITEM_W 이상 떨어짐
-      const t    = Math.min(dist / (ITEM_W * 1.1), 1);
+      
+      // t: 중앙(0)에서 멀어질수록 증가
+      const t = Math.min(dist / (ITEM_W * 1.2), 1.8);
 
-      const scale   = 1    - t * 0.28;   // 1.0 → 0.72
-      const opacity = 1    - t * 0.48;   // 1.0 → 0.52
-      const zIndex  = Math.round((1 - t) * 3);  // 3 → 0
+      // Z축 안쪽으로 사라지도록 음수 translateZ 지정
+      const translateZ = -t * 110; 
+      
+      // 스크롤되면서 바깥쪽이 아닌 안쪽(중앙 방향)으로 꺾여 사라지는 원통 느낌을 주기 위한 X축 보정
+      const direction = cx > centerX ? -1 : 1;
+      const translateX = direction * (t * t * 24);
 
-      el.style.transform = `scale(${scale.toFixed(3)})`;
-      el.style.opacity   = opacity.toFixed(3);
-      el.style.zIndex    = zIndex;
-      // 중앙 아이템에만 box-shadow
-      el.style.boxShadow = t < 0.15
-        ? '0 14px 34px rgba(0,0,0,.22)'
-        : 'none';
+      // scale도 살짝 줄여줌 (translateZ로 이미 작아지므로 보조적인 효과만)
+      const scale = 1 - t * 0.12;
+      const opacity = 1 - Math.min(t * 0.45, 0.75); // 외곽으로 갈수록 페이드 아웃
+      const zIndex = Math.round((2 - t) * 5);
+
+      el.style.transform = `translate3d(${translateX.toFixed(1)}px, 0, ${translateZ.toFixed(1)}px) scale(${scale.toFixed(3)})`;
+      el.style.opacity = opacity.toFixed(3);
+      el.style.zIndex = zIndex;
+
+      // 중앙에 가까울수록 입체감 있는 섀도우를 주고, 멀어지면 섀도우도 페이드 아웃
+      if (t < 0.2) {
+        el.style.boxShadow = '0 12px 28px rgba(0, 0, 0, 0.22)';
+      } else {
+        const shadowOpacity = Math.max(0, 0.22 - (t * 0.12));
+        el.style.boxShadow = `0 8px 16px rgba(0, 0, 0, ${shadowOpacity.toFixed(2)})`;
+      }
     });
   }
 
@@ -730,6 +743,17 @@
       el.dataset.idx     = i;
       el.innerHTML = buildCoverCellHtml(alb.coverUrl, alb.name);
       if (!alb.coverUrl) el.style.background = gradientFor(alb.id);
+
+      // 가운데(활성화된) 앨범 커버를 누르면 그 앨범의 수록곡 표시, 아니면 스크롤 이동
+      el.addEventListener('click', () => {
+        const idx = parseInt(el.dataset.idx, 10);
+        if (idx === carouselIdx) {
+          goToAlbumTracksFromModal(alb.id);
+        } else {
+          scrollToIdx(idx);
+        }
+      });
+
       coverCarouselTrack.appendChild(el);
     });
 
@@ -844,10 +868,11 @@
     }
   }
 
-  function goToAlbumTracksFromModal() {
-    if (!modalCurrentTrack?.albumId) return;
+  function goToAlbumTracksFromModal(albumId) {
+    const targetId = albumId || modalCurrentTrack?.albumId;
+    if (!targetId) return;
     closeTrackModal();
-    loadAlbumTracks(modalCurrentTrack.albumId);
+    loadAlbumTracks(targetId);
   }
 
   function attachCoverLongPress(el, { onShortPress, onLongPress }) {
