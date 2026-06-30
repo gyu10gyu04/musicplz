@@ -202,15 +202,6 @@
     serverError.textContent = msg;
   }
 
-  function showAuthMessageFromUrl() {
-    const verified = new URLSearchParams(location.search).get('verified');
-    if (verified === '1') {
-      showServerError('이메일 인증이 완료됐어요. 이제 로그인할 수 있습니다.');
-    } else if (verified === '0') {
-      showServerError('이메일 인증 링크가 만료됐거나 올바르지 않아요. 다시 회원가입을 시도해주세요.');
-    }
-  }
-
   function loadTurnstileScript() {
     return new Promise((resolve, reject) => {
       if (window.turnstile) return resolve();
@@ -402,15 +393,7 @@
     setLoading(true, mode === 'login' ? '로그인 중…' : '가입 중…');
 
     try {
-      const data = await callAuthApi(mode === 'login' ? 'login' : 'signup', payload);
-      if (mode === 'signup' && data.emailVerificationRequired) {
-        setLoading(false);
-        resetCaptcha();
-        mode = 'login';
-        applyMode();
-        showServerError(data.message || '인증 메일을 보냈어요. 메일함에서 인증을 완료한 뒤 로그인해주세요.');
-        return;
-      }
+      await callAuthApi(mode === 'login' ? 'login' : 'signup', payload);
 
       // 성공 시 보라색 웨이브로 전환하며 홈으로 이동
       playWaveExit('../main/main.html');
@@ -422,5 +405,4 @@
   });
 
   initCaptcha();
-  showAuthMessageFromUrl();
 })();

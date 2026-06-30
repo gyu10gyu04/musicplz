@@ -1,17 +1,12 @@
 // routes/auth.js — 회원가입 / 로그인 / 로그아웃 / 세션 확인 라우트
 const express = require('express');
-const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const {
   createUser,
   findByEmail,
   findById,
   findByDisplayName,
-  createEmailVerificationToken,
-  deletePendingEmailVerificationTokens,
-  verifyEmailByTokenHash,
 } = require('../models/users');
-const { isEmailEnabled, sendVerificationEmail } = require('../services/email');
 
 const router = express.Router();
 
@@ -21,7 +16,6 @@ const BCRYPT_ROUNDS = 10;
 const PG_UNIQUE_VIOLATION = '23505';
 const MAX_PASSWORD_LENGTH = 72; // bcrypt는 72바이트 이후를 무시하므로 길이를 제한합니다.
 const DISPLAY_NAME_RE = /^[0-9A-Za-z가-힣_.-]+$/;
-const EMAIL_VERIFICATION_TTL_MS = 30 * 60 * 1000;
 
 const authBuckets = new Map();
 
@@ -92,55 +86,6 @@ function establishSession(req, userId) {
       req.session.userId = userId;
       resolve();
     });
-  });
-}
-
-function tokenHash(token) {
-  return crypto.createHash('sha256').update(token).digest('hex');
-}
-
-function baseUrl(req) {
-  return (process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
-}
-
-async function sendEmailVerification(req, user) {
-  if (!isEmailEnabled()) {
-    const err = new Error('이메일 인증 발송 설정이 아직 완료되지 않았습니다. 관리자에게 문의해주세요.');
-    err.status = 503;
-    throw err;
-  }
-
-  const token = crypto.randomBytes(32).toString('hex');
-  await deletePendingEmailVerificationTokens(user.id);
-  await createEmailVerificationToken({
-    userId: user.id,
-    tokenHash: tokenHash(token),
-    expiresAt: new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS),
-  });
-
-  const verifyUrl = `${baseUrl(req)}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
-  await sendVerificationEmail({
-    to: user.email,
-    displayName: user.display_name,
-    verifyUrl,
-  });
-}
-
-async function sendEmailVerificationOrRespond(req, res, user, message, status = 201) {
-  if (!isEmailEnabled()) {
-    return res.status(503).json({ error: '이메일 인증 발송 설정이 아직 완료되지 않았습니다. 관리자에게 문의해주세요.' });
-  }
-
-  try {
-    await sendEmailVerification(req, user);
-  } catch (err) {
-    console.error('[이메일 인증 발송 실패]', err.message);
-    return res.status(err.status || 502).json({ error: '인증 메일을 보내지 못했어요. 잠시 후 다시 시도해주세요.' });
-  }
-
-  return res.status(status).json({
-    emailVerificationRequired: true,
-    message,
   });
 }
 
@@ -216,9 +161,6 @@ router.post('/signup', authRateLimit({ windowMs: 15 * 60 * 1000, max: 10, keyPre
 
     const existing = await findByEmail(normalizedEmail);
     if (existing) {
-      if (!existing.email_verified) {
-        return sendEmailVerificationOrRespond(req, res, existing, '이미 가입 대기 중인 이메일이에요. 인증 메일을 다시 보냈어요.', 202);
-      }
       return res.status(409).json({ error: '이미 가입된 이메일이에요.' });
     }
 
@@ -246,25 +188,8 @@ router.post('/signup', authRateLimit({ windowMs: 15 * 60 * 1000, max: 10, keyPre
       throw dbErr;
     }
 
-    return sendEmailVerificationOrRespond(req, res, user, '인증 메일을 보냈어요. 메일함에서 인증을 완료한 뒤 로그인해주세요.', 201);
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.get('/verify-email', async (req, res, next) => {
-  try {
-    const token = String(req.query.token || '').trim();
-    if (!token) {
-      return res.redirect('/login/login.html?verified=0');
-    }
-
-    const user = await verifyEmailByTokenHash(tokenHash(token));
-    if (!user) {
-      return res.redirect('/login/login.html?verified=0');
-    }
-
-    res.redirect('/login/login.html?verified=1');
+    await establishSession(req, user.id);
+    res.status(201).json({ user: publicUser(user) });
   } catch (err) {
     next(err);
   }
@@ -292,10 +217,6 @@ router.post('/login',
 
     if (!user) {
       return res.status(401).json({ error: INVALID });
-    }
-
-    if (!user.email_verified) {
-      return res.status(403).json({ error: '이메일 인증을 완료한 뒤 로그인해주세요.' });
     }
 
     const ok = await bcrypt.compare(String(password), user.password_hash);
