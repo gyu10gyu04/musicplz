@@ -125,6 +125,22 @@ async function verifyTurnstile(req, res, next) {
   }
 }
 
+function requireTurnstileConfig(req, res, next) {
+  if (!process.env.TURNSTILE_SECRET_KEY || !process.env.TURNSTILE_SITE_KEY) {
+    return res.status(503).json({ error: '회원가입 보안 확인 설정이 필요합니다. 관리자에게 문의해주세요.' });
+  }
+
+  next();
+}
+
+function rejectSignupWhileLoggedIn(req, res, next) {
+  if (req.session.userId) {
+    return res.status(400).json({ error: '이미 로그인된 상태에서는 새 계정을 만들 수 없어요. 로그아웃 후 다시 시도해주세요.' });
+  }
+
+  next();
+}
+
 function publicUser(user) {
   if (!user) return null;
   return { id: user.id, email: user.email, displayName: user.display_name };
@@ -138,7 +154,13 @@ router.get('/security-config', (req, res) => {
   });
 });
 
-router.post('/signup', authRateLimit({ windowMs: 15 * 60 * 1000, max: 10, keyPrefix: 'signup' }), verifyTurnstile, async (req, res, next) => {
+router.post('/signup',
+  rejectSignupWhileLoggedIn,
+  authRateLimit({ windowMs: 60 * 60 * 1000, max: 3, keyPrefix: 'signup-hour' }),
+  authRateLimit({ windowMs: 24 * 60 * 60 * 1000, max: 8, keyPrefix: 'signup-day' }),
+  requireTurnstileConfig,
+  verifyTurnstile,
+  async (req, res, next) => {
   try {
     const { email, password, displayName } = req.body || {};
 
@@ -193,7 +215,8 @@ router.post('/signup', authRateLimit({ windowMs: 15 * 60 * 1000, max: 10, keyPre
   } catch (err) {
     next(err);
   }
-});
+  }
+);
 
 router.post('/login',
   authRateLimit({ windowMs: 15 * 60 * 1000, max: 30, keyPrefix: 'login-ip' }),
