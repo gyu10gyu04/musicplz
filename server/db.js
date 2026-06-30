@@ -47,6 +47,46 @@ async function initSchema() {
     if (err.code !== '23505') throw err;
     console.warn('[경고] 기존 users 데이터에 중복 닉네임이 있어 닉네임 유니크 인덱스를 만들지 못했습니다. 중복 데이터를 정리해주세요.');
   }
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS playlists (
+      id         SERIAL PRIMARY KEY,
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      title      TEXT NOT NULL,
+      cover_url  TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS playlist_tracks (
+      id               SERIAL PRIMARY KEY,
+      playlist_id      INTEGER NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,
+      spotify_track_id TEXT NOT NULL,
+      title            TEXT NOT NULL,
+      artist           TEXT NOT NULL,
+      album            TEXT,
+      cover_url        TEXT,
+      duration_ms      INTEGER,
+      position         INTEGER NOT NULL
+    );
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS playlist_likes (
+      user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      playlist_id INTEGER NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (user_id, playlist_id)
+    );
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS playlist_saves (
+      user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      playlist_id INTEGER NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (user_id, playlist_id)
+    );
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS playlists_created_at_idx ON playlists (created_at DESC);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS playlist_tracks_playlist_id_idx ON playlist_tracks (playlist_id, position);`);
   // express-session용 세션 테이블(session)은 connect-pg-simple이 자동으로 생성합니다.
 }
 

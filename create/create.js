@@ -558,6 +558,7 @@
   const playlistSaveBtn = document.getElementById('playlistSaveBtn');
 
   let playlistCoverObjectUrl = null;
+  let playlistCoverValue = '';
   let activeSortDrag = null;
 
   function attachSortablePointerDrag(item, index, { listEl, itemSelector, renderList }) {
@@ -699,14 +700,24 @@
     }, 220);
   }
 
-  function setPlaylistCover(url) {
+  function setPlaylistCover(url, value = url) {
     if (playlistCoverObjectUrl) {
       URL.revokeObjectURL(playlistCoverObjectUrl);
       playlistCoverObjectUrl = null;
     }
+    playlistCoverValue = value;
     playlistCoverPreview.src = url;
     playlistCoverPreview.hidden = false;
     playlistCoverEmpty.hidden = true;
+  }
+
+  function readFileAsDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
   }
 
   function playlistAlbumCoverChoices() {
@@ -820,11 +831,19 @@
     });
   }
 
-  playlistCoverInput.addEventListener('change', () => {
+  playlistCoverInput.addEventListener('change', async () => {
     const file = playlistCoverInput.files?.[0];
     if (!file) return;
     if (playlistCoverObjectUrl) URL.revokeObjectURL(playlistCoverObjectUrl);
     playlistCoverObjectUrl = URL.createObjectURL(file);
+    const dataUrl = await readFileAsDataUrl(file);
+    if (dataUrl.length > 1_900_000) {
+      playlistTitleError.textContent = '커버 이미지는 2MB 이하로 선택해주세요.';
+      URL.revokeObjectURL(playlistCoverObjectUrl);
+      playlistCoverObjectUrl = null;
+      return;
+    }
+    playlistCoverValue = dataUrl;
     playlistCoverPreview.src = playlistCoverObjectUrl;
     playlistCoverPreview.hidden = false;
     playlistCoverEmpty.hidden = true;
@@ -860,15 +879,46 @@
     }
   });
 
-  playlistSaveBtn.addEventListener('click', () => {
+  playlistSaveBtn.addEventListener('click', async () => {
     const title = playlistTitleInput.value.trim();
     if (!title) {
       playlistTitleError.textContent = '제목을 입력해주세요.';
       playlistTitleInput.focus();
       return;
     }
+    if (!playlistCoverValue) {
+      playlistTitleError.textContent = '대표 커버를 선택해주세요.';
+      return;
+    }
     playlistTitleError.textContent = '';
-    alert(`"${title}" 플레이리스트를 만들 준비가 됐어요.\n${selectedOrder.length}곡이 담겨 있습니다.`);
+
+    const tracks = selectedOrder.map(id => trackById(id)).filter(Boolean).map(track => ({
+      id: track.id,
+      title: track.title,
+      artist: track.artist,
+      album: track.album,
+      coverUrl: track.coverUrl,
+      durationMs: track.durationMs,
+    }));
+
+    playlistSaveBtn.disabled = true;
+    playlistSaveBtn.textContent = '저장 중...';
+
+    try {
+      const res = await fetch('/api/playlists', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ title, coverUrl: playlistCoverValue, tracks }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || '플레이리스트를 저장하지 못했어요.');
+      location.href = `/playlist/playlist.html?id=${encodeURIComponent(data.playlist.id)}`;
+    } catch (err) {
+      playlistTitleError.textContent = err.message;
+      playlistSaveBtn.disabled = false;
+      playlistSaveBtn.textContent = '완료';
+    }
   });
 
   playlistComposerClose.addEventListener('click', closePlaylistComposer);

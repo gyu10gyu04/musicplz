@@ -19,6 +19,7 @@ const pgSession = require('connect-pg-simple')(session);
 const { pool, initSchema } = require('./db');
 const authRoutes = require('./routes/auth');
 const musicRoutes = require('./routes/music');
+const playlistRoutes = require('./routes/playlists');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -98,7 +99,7 @@ function sameOriginOnly(req, res, next) {
 }
 
 /* ─── 바디 파서 ─── */
-app.use(express.json({ limit: '16kb' }));
+app.use(express.json({ limit: '2mb' }));
 
 app.use('/api', rateLimit({ windowMs: 60 * 1000, max: 120, keyPrefix: 'api' }));
 app.use('/api', sameOriginOnly);
@@ -130,6 +131,7 @@ app.use(session({
 /* ─── API 라우트 ─── */
 app.use('/api/auth', authRoutes);
 app.use('/api/music', musicRoutes);
+app.use('/api/playlists', playlistRoutes);
 
 /* ─── 정적 파일 서빙 ───
    프로젝트 폴더 구조(main/, login/, create/)를 그대로 서빙합니다.
@@ -137,6 +139,7 @@ app.use('/api/music', musicRoutes);
 app.use('/main', express.static(path.join(__dirname, '..', 'main')));
 app.use('/login', express.static(path.join(__dirname, '..', 'login')));
 app.use('/create', express.static(path.join(__dirname, '..', 'create')));
+app.use('/playlist', express.static(path.join(__dirname, '..', 'playlist')));
 
 /* 루트 접속 시 홈으로 리다이렉트 */
 app.get('/', (req, res) => res.redirect('/main/main.html'));
