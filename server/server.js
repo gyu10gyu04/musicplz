@@ -99,7 +99,7 @@ function sameOriginOnly(req, res, next) {
 }
 
 /* ─── 바디 파서 ─── */
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '4mb' }));
 
 app.use('/api', rateLimit({ windowMs: 60 * 1000, max: 120, keyPrefix: 'api' }));
 app.use('/api', sameOriginOnly);

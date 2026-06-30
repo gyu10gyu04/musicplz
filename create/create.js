@@ -720,6 +720,35 @@
     });
   }
 
+  function compressImageFile(file, { maxSize = 900, quality = 0.82 } = {}) {
+    return new Promise((resolve, reject) => {
+      const objectUrl = URL.createObjectURL(file);
+      const img = new Image();
+
+      img.onload = () => {
+        const scale = Math.min(1, maxSize / Math.max(img.naturalWidth, img.naturalHeight));
+        const width = Math.max(1, Math.round(img.naturalWidth * scale));
+        const height = Math.max(1, Math.round(img.naturalHeight * scale));
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        URL.revokeObjectURL(objectUrl);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error('커버 이미지를 읽지 못했어요. 다른 사진을 선택해주세요.'));
+      };
+
+      img.src = objectUrl;
+    });
+  }
+
   function playlistAlbumCoverChoices() {
     const seen = new Set();
     const choices = [];
@@ -835,20 +864,24 @@
     const file = playlistCoverInput.files?.[0];
     if (!file) return;
     if (playlistCoverObjectUrl) URL.revokeObjectURL(playlistCoverObjectUrl);
-    playlistCoverObjectUrl = URL.createObjectURL(file);
-    const dataUrl = await readFileAsDataUrl(file);
-    if (dataUrl.length > 1_900_000) {
-      playlistTitleError.textContent = '커버 이미지는 2MB 이하로 선택해주세요.';
-      URL.revokeObjectURL(playlistCoverObjectUrl);
-      playlistCoverObjectUrl = null;
-      return;
+
+    try {
+      const dataUrl = await compressImageFile(file);
+      if (dataUrl.length > 1_900_000) {
+        playlistTitleError.textContent = '커버 이미지가 너무 큽니다. 더 작은 사진을 선택해주세요.';
+        playlistCoverObjectUrl = null;
+        return;
+      }
+      playlistCoverValue = dataUrl;
+      playlistCoverPreview.src = dataUrl;
+      playlistCoverPreview.hidden = false;
+      playlistCoverEmpty.hidden = true;
+      playlistCoverMenu.hidden = true;
+      playlistAlbumCoverPanel.hidden = true;
+      playlistTitleError.textContent = '';
+    } catch (err) {
+      playlistTitleError.textContent = err.message;
     }
-    playlistCoverValue = dataUrl;
-    playlistCoverPreview.src = playlistCoverObjectUrl;
-    playlistCoverPreview.hidden = false;
-    playlistCoverEmpty.hidden = true;
-    playlistCoverMenu.hidden = true;
-    playlistAlbumCoverPanel.hidden = true;
   });
 
   playlistCoverPicker.addEventListener('click', e => {
