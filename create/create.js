@@ -578,6 +578,7 @@
           activeSortDrag.active = true;
           activeSortDrag.children = children;
           activeSortDrag.containerTop = containerRect.top;
+          activeSortDrag.startScrollTop = listEl.scrollTop;
           activeSortDrag.positions = children.map(child => ({
             top: child.offsetTop,
             mid: child.offsetTop + child.offsetHeight / 2,
@@ -610,12 +611,12 @@
 
       e.preventDefault();
       const children = activeSortDrag.children;
-      const relativeY = e.clientY - activeSortDrag.containerTop + listEl.scrollTop;
+      const pointerY = e.clientY - activeSortDrag.containerTop + listEl.scrollTop;
 
       let nextTargetIdx = activeSortDrag.index;
       let minDist = Infinity;
       activeSortDrag.positions.forEach((pos, i) => {
-        const dist = Math.abs(relativeY - pos.mid);
+        const dist = Math.abs(pointerY - pos.mid);
         if (dist < minDist) {
           minDist = dist;
           nextTargetIdx = i;
