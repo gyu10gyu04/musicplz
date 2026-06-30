@@ -669,7 +669,12 @@ nav{
   border: 1px solid #eee8f8;
   cursor: grab;
   transition: background 0.15s, transform 0.28s cubic-bezier(0.2, 1, 0.2, 1), box-shadow 0.2s ease, opacity 0.2s ease, filter 0.2s ease;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+  -webkit-user-select: none;
   user-select: none;
+  touch-action: pan-y;
+  -webkit-tap-highlight-color: transparent;
 }
 .selected-track-item:active {
   cursor: grabbing;
@@ -706,6 +711,8 @@ nav{
 }
 .selected-track-cover img {
   width: 100%; height: 100%; object-fit: cover;
+  -webkit-user-drag: none;
+  pointer-events: none;
 }
 
 .selected-track-info {
@@ -720,6 +727,13 @@ nav{
 .selected-track-artist {
   font-size: 0.82rem; color: rgba(0,0,0,0.5);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+body.is-touch-sorting,
+body.is-touch-sorting * {
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
 }
 
 .selected-track-remove {
