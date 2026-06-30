@@ -24,6 +24,10 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const IS_PROD = process.env.NODE_ENV === 'production';
 
+if (IS_PROD && !process.env.SESSION_SECRET) {
+  throw new Error('운영 환경에서는 SESSION_SECRET 환경 변수를 반드시 설정해야 합니다.');
+}
+
 app.disable('x-powered-by');
 
 // Render(및 대부분의 PaaS)는 리버스 프록시 뒤에서 앱을 실행합니다.
@@ -31,8 +35,73 @@ app.disable('x-powered-by');
 // secure 쿠키가 항상 거부되고, 로그인이 안 되는 것처럼 보일 수 있습니다.
 app.set('trust proxy', 1);
 
+/* ─── 기본 보안 헤더 ─── */
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+  if (IS_PROD) {
+    res.setHeader('Strict-Transport-Security', 'max-age=15552000; includeSubDomains');
+  }
+  next();
+});
+
+/* ─── 간단한 인메모리 요청 제한 ───
+   PaaS/프록시 앞단의 DDoS 방어를 대체할 수는 없지만, 앱 레벨의 과도한 API 호출과
+   무차별 대입 시도를 줄이는 1차 방어선입니다. */
+const rateBuckets = new Map();
+
+function rateLimit({ windowMs, max, keyPrefix }) {
+  return (req, res, next) => {
+    const now = Date.now();
+    const key = `${keyPrefix}:${req.ip}`;
+    const bucket = rateBuckets.get(key) || { count: 0, resetAt: now + windowMs };
+
+    if (now > bucket.resetAt) {
+      bucket.count = 0;
+      bucket.resetAt = now + windowMs;
+    }
+
+    bucket.count += 1;
+    rateBuckets.set(key, bucket);
+
+    if (bucket.count > max) {
+      res.setHeader('Retry-After', String(Math.ceil((bucket.resetAt - now) / 1000)));
+      return res.status(429).json({ error: '요청이 너무 많아요. 잠시 후 다시 시도해주세요.' });
+    }
+
+    next();
+  };
+}
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, bucket] of rateBuckets.entries()) {
+    if (now > bucket.resetAt) rateBuckets.delete(key);
+  }
+}, 10 * 60 * 1000).unref();
+
+function sameOriginOnly(req, res, next) {
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
+
+  const origin = req.get('origin');
+  if (!origin) return next();
+
+  const expectedOrigin = `${req.protocol}://${req.get('host')}`;
+  if (origin !== expectedOrigin) {
+    return res.status(403).json({ error: '허용되지 않은 요청 출처입니다.' });
+  }
+
+  next();
+}
+
 /* ─── 바디 파서 ─── */
-app.use(express.json());
+app.use(express.json({ limit: '16kb' }));
+
+app.use('/api', rateLimit({ windowMs: 60 * 1000, max: 120, keyPrefix: 'api' }));
+app.use('/api', sameOriginOnly);
 
 /* ─── 세션 설정 ───
    세션 데이터는 connect-pg-simple을 통해 PostgreSQL의 별도 테이블(session)에
@@ -40,6 +109,7 @@ app.use(express.json());
    (SQLite와 달리, Render 무료 플랜에서도 PostgreSQL 데이터는 디스크가 아니라
     별도 관리형 DB에 저장되므로 재배포 시 사라지지 않습니다.) */
 app.use(session({
+  name: 'mp.sid',
   store: new pgSession({
     pool,
     tableName: 'session',
@@ -48,6 +118,7 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'musicplz-dev-secret-change-me',
   resave: false,
   saveUninitialized: false,
+  rolling: true,
   cookie: {
     httpOnly: true,
     sameSite: 'lax',

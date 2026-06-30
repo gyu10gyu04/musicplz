@@ -159,6 +159,22 @@
   const serverError   = document.getElementById('serverError');
 
   const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const ALLOWED_EMAIL_DOMAINS = new Set([
+    'gmail.com',
+    'googlemail.com',
+    'naver.com',
+    'kakao.com',
+    'daum.net',
+    'hanmail.net',
+    'nate.com',
+    'outlook.com',
+    'hotmail.com',
+    'icloud.com',
+  ]);
+
+  function emailDomain(value) {
+    return value.trim().toLowerCase().split('@')[1] || '';
+  }
 
   function setFieldError(input, errorEl, msg) {
     input.classList.toggle('has-error', !!msg);
@@ -188,6 +204,9 @@
     } else if (!EMAIL_RE.test(emailInput.value.trim())) {
       setFieldError(emailInput, emailError, '올바른 이메일 형식이 아니에요.');
       ok = false;
+    } else if (mode === 'signup' && !ALLOWED_EMAIL_DOMAINS.has(emailDomain(emailInput.value))) {
+      setFieldError(emailInput, emailError, 'Gmail, Naver, Kakao 등 지원하는 이메일만 사용할 수 있어요.');
+      ok = false;
     } else {
       setFieldError(emailInput, emailError, '');
     }
@@ -197,6 +216,12 @@
       ok = false;
     } else if (pwInput.value.length < 8) {
       setFieldError(pwInput, passwordError, '비밀번호는 8자 이상이어야 해요.');
+      ok = false;
+    } else if (pwInput.value.length > 72) {
+      setFieldError(pwInput, passwordError, '비밀번호는 72자 이하로 입력해주세요.');
+      ok = false;
+    } else if (mode === 'signup' && (!/[A-Za-z]/.test(pwInput.value) || !/\d/.test(pwInput.value))) {
+      setFieldError(pwInput, passwordError, '비밀번호는 영문과 숫자를 모두 포함해야 해요.');
       ok = false;
     } else {
       setFieldError(pwInput, passwordError, '');
