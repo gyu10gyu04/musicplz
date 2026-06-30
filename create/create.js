@@ -482,6 +482,11 @@
       if (card) card.classList.add('is-selected');
     }
     renderTray();
+    if (!selectedTracksModalBackdrop.hidden) renderSelectedTracksList();
+    if (!playlistComposerBackdrop.hidden) {
+      renderPlaylistComposerList();
+      if (selectedOrder.length === 0) closePlaylistComposer();
+    }
   }
 
   function renderTray() {
@@ -568,7 +573,14 @@
         active: false,
         timer: window.setTimeout(() => {
           if (!activeSortDrag || activeSortDrag.item !== item) return;
+          const children = [...listEl.querySelectorAll(itemSelector)];
           activeSortDrag.active = true;
+          activeSortDrag.positions = children.map(child => ({
+            top: child.offsetTop,
+            mid: child.offsetTop + child.offsetHeight / 2,
+            height: child.offsetHeight,
+          }));
+          activeSortDrag.shiftY = (children[index]?.offsetHeight || 70) + 12;
           item.classList.remove('is-pressing');
           item.classList.add('is-dragging');
           listEl.classList.add('is-sorting');
@@ -601,9 +613,8 @@
 
       let nextTargetIdx = activeSortDrag.index;
       let minDist = Infinity;
-      children.forEach((child, i) => {
-        const childMidY = child.offsetTop + child.offsetHeight / 2;
-        const dist = Math.abs(relativeY - childMidY);
+      activeSortDrag.positions.forEach((pos, i) => {
+        const dist = Math.abs(relativeY - pos.mid);
         if (dist < minDist) {
           minDist = dist;
           nextTargetIdx = i;
@@ -611,7 +622,7 @@
       });
 
       activeSortDrag.targetIdx = nextTargetIdx;
-      const shiftY = (children[0]?.offsetHeight || 70) + 12;
+      const shiftY = activeSortDrag.shiftY || ((children[0]?.offsetHeight || 70) + 12);
 
       children.forEach((child, i) => {
         if (child === item) return;
