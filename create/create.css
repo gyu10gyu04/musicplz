@@ -372,7 +372,8 @@ nav{
   position:relative;
   width:100%;max-width:340px;
   background:#fff;border-radius:24px;
-  padding:28px 26px 30px;
+  min-height:366px;
+  padding:28px 26px 28px;
   text-align:center;
   box-shadow:0 24px 60px rgba(0,0,0,.22);
   transform:scale(.92) translateY(10px);
@@ -403,6 +404,7 @@ nav{
 
 /* ── 커버 영역 + 아티스트 다른 앨범 캐러셀 ── */
 .track-modal-cover-row{
+  min-height:164px;
   margin:4px 0 16px;
   overflow:visible;
 }
@@ -534,11 +536,6 @@ nav{
   transition:opacity .15s ease;
 }
 
-.track-modal-hint{
-  margin-top:14px;
-  font-size:.72rem;color:rgba(0,0,0,.32);line-height:1.6;
-}
-
 /* ── 검색 결과 영역: 앨범 모드 뒤로가기 버튼 / 더보기 버튼 ── */
 .results-header{
   display:flex;align-items:center;gap:12px;
@@ -588,15 +585,15 @@ nav{
 /* ── 담은 곡 목록 모달 (트레이의 +버튼 클릭 시 표시) ── */
 .selected-tracks-modal-backdrop {
   position: fixed; inset: 0; z-index: 4500;
-  background: rgba(10,8,20,0.5);
-  backdrop-filter: blur(8px);
-  display: flex; align-items: center; justify-content: center;
-  padding: 20px;
+  background: transparent;
+  backdrop-filter: none;
+  display: flex; align-items: flex-end; justify-content: flex-end;
+  padding: 20px 5% 112px;
   opacity: 0; pointer-events: none;
   transition: opacity 0.25s ease;
 }
 .selected-tracks-modal-backdrop.is-open {
-  opacity: 1; pointer-events: auto;
+  opacity: 1; pointer-events: none;
 }
 .selected-tracks-modal-backdrop[hidden] {
   display: none;
@@ -608,14 +605,15 @@ nav{
   background: #ffffff; border-radius: 24px;
   padding: 28px 24px;
   box-shadow: 0 24px 68px rgba(0, 0, 0, 0.24);
-  transform: scale(0.92) translateY(12px);
+  transform: translateY(18px);
   opacity: 0;
   transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease;
   display: flex; flex-direction: column;
-  max-height: 80vh;
+  max-height: min(58vh, 520px);
+  pointer-events: auto;
 }
 .selected-tracks-modal-backdrop.is-open .selected-tracks-modal {
-  transform: scale(1) translateY(0);
+  transform: translateY(0);
   opacity: 1;
 }
 
@@ -669,10 +667,19 @@ nav{
   border: 1px solid #eee8f8;
   cursor: grab;
   transition: background 0.15s, transform 0.28s cubic-bezier(0.2, 1, 0.2, 1), box-shadow 0.2s ease, opacity 0.2s ease, filter 0.2s ease;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
   user-select: none;
+  touch-action: pan-y;
+  -webkit-tap-highlight-color: transparent;
 }
 .selected-track-item:active {
   cursor: grabbing;
+}
+.selected-track-item.is-pressing {
+  transform: scale(0.975);
+  border-color: rgba(124,58,237,0.34);
+  box-shadow: 0 8px 22px rgba(124,58,237,0.14);
 }
 
 /* 드래그 중인 카드: 진하고 선명하게 + 그림자로 떠 있는 느낌 */
@@ -683,13 +690,13 @@ nav{
   box-shadow: 0 12px 36px rgba(124, 58, 237, 0.28), 0 4px 12px rgba(0,0,0,0.12);
   filter: none !important;
   z-index: 10;
+  cursor: grabbing;
 }
 
-/* 드래그 중일 때 나머지 카드들: 유리처럼 흐릿하게 비치는 효과 */
+/* 드래그 중에도 목록은 선명하게 유지 */
 .selected-tracks-modal-list.is-sorting .selected-track-item:not(.is-dragging) {
-  opacity: 0.55;
-  filter: blur(0.6px) brightness(0.97);
-  background: rgba(248, 246, 252, 0.6);
+  opacity: 1;
+  filter: none;
 }
 
 .selected-track-item:hover:not(.is-dragging) {
@@ -706,6 +713,8 @@ nav{
 }
 .selected-track-cover img {
   width: 100%; height: 100%; object-fit: cover;
+  pointer-events: none;
+  -webkit-user-drag: none;
 }
 
 .selected-track-info {

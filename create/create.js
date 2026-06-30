@@ -482,6 +482,11 @@
       if (card) card.classList.add('is-selected');
     }
     renderTray();
+    if (selectedOrder.length > 0) {
+      openSelectedTracksModal();
+    } else {
+      closeSelectedTracksModal();
+    }
   }
 
   function renderTray() {
@@ -524,6 +529,7 @@
     selectedOrder.length = 0;
     resultsGrid.querySelectorAll('.track-card.is-selected').forEach(c => c.classList.remove('is-selected'));
     renderTray();
+    closeSelectedTracksModal();
   });
 
   trayCreateBtn.addEventListener('click', () => {
@@ -552,6 +558,7 @@
   let modalArtistAlbums      = null;   // 서버에서 받아온 앨범 목록 캐시
   let modalCarouselAlbums    = [];     // 실제 캐러셀에 쓰이는 배열 (현재 앨범 포함)
   let modalCarouselExpanded  = false;
+  let ignoreCoverInputUntil  = 0;
 
   /* ── 담은 곡 목록 모달 관련 선택자 및 제어 함수 ── */
   const selectedTracksModalBackdrop = document.getElementById('selectedTracksModalBackdrop');
@@ -577,6 +584,130 @@
 
   let draggedIdx = null;
   let targetIdx = null;
+  let selectedPress = null;
+
+  function selectedTrackItems() {
+    return [...selectedTracksModalList.querySelectorAll('.selected-track-item')];
+  }
+
+  function clearSelectedTrackTransforms() {
+    selectedTrackItems().forEach(item => { item.style.transform = ''; });
+  }
+
+  function updateSelectedTrackTarget(clientY) {
+    if (draggedIdx === null) return;
+
+    const children = selectedTrackItems();
+    const containerRect = selectedTracksModalList.getBoundingClientRect();
+    const relativeY = clientY - containerRect.top + selectedTracksModalList.scrollTop;
+
+    let tempTarget = draggedIdx;
+    let minDist = Infinity;
+
+    children.forEach((child, k) => {
+      const childMidY = child.offsetTop + child.offsetHeight / 2;
+      const d = Math.abs(relativeY - childMidY);
+      if (d < minDist) {
+        minDist = d;
+        tempTarget = k;
+      }
+    });
+
+    targetIdx = tempTarget;
+    const shiftY = ((children[0]?.offsetHeight || 70) + 12);
+
+    children.forEach((child, k) => {
+      if (k === draggedIdx) return;
+      child.style.transform = '';
+
+      if (draggedIdx < targetIdx && k > draggedIdx && k <= targetIdx) {
+        child.style.transform = `translateY(-${shiftY}px)`;
+      } else if (draggedIdx > targetIdx && k >= targetIdx && k < draggedIdx) {
+        child.style.transform = `translateY(${shiftY}px)`;
+      }
+    });
+  }
+
+  function finishSelectedTrackDrag() {
+    if (targetIdx !== null && draggedIdx !== null && targetIdx !== draggedIdx) {
+      const [removed] = selectedOrder.splice(draggedIdx, 1);
+      selectedOrder.splice(targetIdx, 0, removed);
+      renderSelectedTracksList();
+      renderTray();
+    } else {
+      clearSelectedTrackTransforms();
+    }
+
+    draggedIdx = null;
+    targetIdx = null;
+    selectedTracksModalList.classList.remove('is-sorting');
+  }
+
+  function clearSelectedPress() {
+    if (!selectedPress) return;
+    window.clearTimeout(selectedPress.timer);
+    selectedPress.item.classList.remove('is-pressing');
+    selectedPress = null;
+  }
+
+  function attachSelectedTrackDrag(item, index) {
+    item.addEventListener('pointerdown', e => {
+      if (e.button !== undefined && e.button !== 0) return;
+      if (e.target.closest('.selected-track-remove')) return;
+
+      clearSelectedPress();
+      item.classList.add('is-pressing');
+      selectedPress = {
+        item,
+        pointerId: e.pointerId,
+        startX: e.clientX,
+        startY: e.clientY,
+        active: false,
+        timer: window.setTimeout(() => {
+          if (!selectedPress || selectedPress.item !== item) return;
+          selectedPress.active = true;
+          draggedIdx = index;
+          targetIdx = index;
+          item.classList.remove('is-pressing');
+          item.classList.add('is-dragging');
+          selectedTracksModalList.classList.add('is-sorting');
+          item.setPointerCapture?.(e.pointerId);
+        }, 220),
+      };
+    });
+
+    item.addEventListener('pointermove', e => {
+      if (!selectedPress || selectedPress.item !== item) return;
+
+      const dx = Math.abs(e.clientX - selectedPress.startX);
+      const dy = Math.abs(e.clientY - selectedPress.startY);
+
+      if (!selectedPress.active) {
+        if (dx > 10 || dy > 10) clearSelectedPress();
+        return;
+      }
+
+      e.preventDefault();
+      updateSelectedTrackTarget(e.clientY);
+    });
+
+    item.addEventListener('pointerup', e => {
+      if (!selectedPress || selectedPress.item !== item) return;
+      const wasActive = selectedPress.active;
+      item.releasePointerCapture?.(e.pointerId);
+      clearSelectedPress();
+      item.classList.remove('is-dragging');
+      if (wasActive) finishSelectedTrackDrag();
+    });
+
+    item.addEventListener('pointercancel', () => {
+      clearSelectedPress();
+      item.classList.remove('is-dragging');
+      finishSelectedTrackDrag();
+    });
+
+    item.addEventListener('contextmenu', e => e.preventDefault());
+  }
 
   function renderSelectedTracksList() {
     selectedTracksModalList.innerHTML = '';
@@ -591,7 +722,7 @@
 
       const item = document.createElement('div');
       item.className = 'selected-track-item';
-      item.draggable = true;
+      item.draggable = false;
       item.dataset.index = i;
 
       const coverInner = track.coverUrl
@@ -613,31 +744,7 @@
         </button>
       `;
 
-      // 드래그앤드롭 이벤트 리스너
-      item.addEventListener('dragstart', (e) => {
-        draggedIdx = i;
-        item.classList.add('is-dragging');
-        e.dataTransfer.effectAllowed = 'move';
-        selectedTracksModalList.classList.add('is-sorting');
-      });
-
-      item.addEventListener('dragend', () => {
-        item.classList.remove('is-dragging');
-        selectedTracksModalList.classList.remove('is-sorting');
-
-        // 모든 변형 속성 초기화
-        const children = [...selectedTracksModalList.children];
-        children.forEach(child => child.style.transform = '');
-
-        if (targetIdx !== null && targetIdx !== draggedIdx) {
-          const [removed] = selectedOrder.splice(draggedIdx, 1);
-          selectedOrder.splice(targetIdx, 0, removed);
-          renderSelectedTracksList();
-          renderTray();
-        }
-        draggedIdx = null;
-        targetIdx = null;
-      });
+      attachSelectedTrackDrag(item, i);
 
       item.querySelector('.selected-track-remove').addEventListener('click', (e) => {
         e.stopPropagation();
@@ -646,47 +753,6 @@
       });
 
       selectedTracksModalList.appendChild(item);
-    });
-
-    // 벌어지는 애니메이션 처리를 위한 컨테이너 드래그오버 리스너 (레이아웃 고정형 offsetTop 기반)
-    selectedTracksModalList.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      if (draggedIdx === null) return;
-
-      const children = [...selectedTracksModalList.children];
-      const containerRect = selectedTracksModalList.getBoundingClientRect();
-      const relativeY = e.clientY - containerRect.top + selectedTracksModalList.scrollTop;
-
-      let tempTarget = draggedIdx;
-      let minDist = Infinity;
-
-      // offsetTop은 transform: translateY의 영향을 받지 않는 절대 위치이므로 계산에 완벽한 무결성을 지닙니다.
-      children.forEach((child, k) => {
-        const childMidY = child.offsetTop + child.offsetHeight / 2;
-        const d = Math.abs(relativeY - childMidY);
-        if (d < minDist) {
-          minDist = d;
-          tempTarget = k;
-        }
-      });
-
-      targetIdx = tempTarget;
-
-      // 드래그 위치에 맞추어 카드들이 벌어지는 느낌의 CSS Transform 동적 계산 적용
-      children.forEach((child, k) => {
-        if (k === draggedIdx) return;
-        child.style.transform = '';
-
-        if (draggedIdx < targetIdx) {
-          if (k > draggedIdx && k <= targetIdx) {
-            child.style.transform = 'translateY(-82px)'; // Item height 70px + gap 12px
-          }
-        } else if (draggedIdx > targetIdx) {
-          if (k >= targetIdx && k < draggedIdx) {
-            child.style.transform = 'translateY(82px)';
-          }
-        }
-      });
     });
   }
 
@@ -732,6 +798,7 @@
   }
 
   function openTrackModal(track) {
+    ignoreCoverInputUntil = Date.now() + 350;
     modalCurrentTrack      = track;
     modalCurrentArtistName = track.artist;
     modalArtistAlbums      = null;
@@ -1046,8 +1113,8 @@
     coverCarouselTrack.classList.add('is-expanded');
     modalCarouselExpanded = true;
     trackModal.classList.add('is-carousel-open');
-    carouselHint.hidden = false;
-    carouselHint.textContent = '← 스크롤해서 다른 앨범 보기 →';
+    carouselHint.hidden = true;
+    carouselHint.textContent = '';
     carouselHint.classList.remove('is-notice');
 
     buildScrollCarouselDom();
@@ -1114,6 +1181,7 @@
     let startX = 0, startY = 0, triggered = false, cancelled = false;
     function clear() { window.clearTimeout(timer); timer = null; el.classList.remove('is-pressing'); }
     function start(x, y) {
+      if (Date.now() < ignoreCoverInputUntil) return;
       triggered = false; cancelled = false; startX = x; startY = y;
       el.classList.add('is-pressing');
       timer = window.setTimeout(() => { triggered = true; el.classList.remove('is-pressing'); onLongPress(); }, LONG_PRESS_MS);
@@ -1123,7 +1191,9 @@
       if (Math.abs(x - startX) > COVER_MOVE_CANCEL_PX || Math.abs(y - startY) > COVER_MOVE_CANCEL_PX) { cancelled = true; clear(); }
     }
     function end() {
+      if (!timer) return;
       const was = triggered, wc = cancelled; clear(); triggered = false; cancelled = false;
+      if (Date.now() < ignoreCoverInputUntil) return;
       if (!was && !wc && !modalCarouselExpanded) onShortPress();
     }
     el.addEventListener('mousedown', e => start(e.clientX, e.clientY));
