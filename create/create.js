@@ -543,8 +543,15 @@
   const playlistComposerBackdrop = document.getElementById('playlistComposerBackdrop');
   const playlistComposerClose = document.getElementById('playlistComposerClose');
   const playlistCoverInput = document.getElementById('playlistCoverInput');
+  const playlistCoverPicker = document.getElementById('playlistCoverPicker');
   const playlistCoverPreview = document.getElementById('playlistCoverPreview');
   const playlistCoverEmpty = document.getElementById('playlistCoverEmpty');
+  const playlistCoverMenu = document.getElementById('playlistCoverMenu');
+  const playlistPhotoPickBtn = document.getElementById('playlistPhotoPickBtn');
+  const playlistAlbumPickBtn = document.getElementById('playlistAlbumPickBtn');
+  const playlistAlbumCoverPanel = document.getElementById('playlistAlbumCoverPanel');
+  const playlistAlbumCoverGrid = document.getElementById('playlistAlbumCoverGrid');
+  const playlistAlbumCoverEmpty = document.getElementById('playlistAlbumCoverEmpty');
   const playlistTitleInput = document.getElementById('playlistTitleInput');
   const playlistTitleError = document.getElementById('playlistTitleError');
   const playlistComposerList = document.getElementById('playlistComposerList');
@@ -579,11 +586,15 @@
           activeSortDrag.children = children;
           activeSortDrag.containerTop = containerRect.top;
           activeSortDrag.startScrollTop = listEl.scrollTop;
-          activeSortDrag.positions = children.map(child => ({
-            top: child.offsetTop,
-            mid: child.offsetTop + child.offsetHeight / 2,
-            height: child.offsetHeight,
-          }));
+          activeSortDrag.positions = children.map(child => {
+            const rect = child.getBoundingClientRect();
+            const top = rect.top - containerRect.top + listEl.scrollTop;
+            return {
+              top,
+              mid: top + rect.height / 2,
+              height: rect.height,
+            };
+          });
           activeSortDrag.shiftY = (children[index]?.offsetHeight || 70) + 12;
           activeSortDrag.lastTargetIdx = index;
           item.classList.remove('is-pressing');
@@ -672,17 +683,94 @@
   function openPlaylistComposer() {
     playlistTitleError.textContent = '';
     renderPlaylistComposerList();
+    renderPlaylistAlbumCoverChoices();
     playlistComposerBackdrop.hidden = false;
     requestAnimationFrame(() => playlistComposerBackdrop.classList.add('is-open'));
   }
 
   function closePlaylistComposer() {
     playlistComposerBackdrop.classList.remove('is-open');
+    playlistCoverMenu.hidden = true;
+    playlistAlbumCoverPanel.hidden = true;
     setTimeout(() => {
       if (!playlistComposerBackdrop.classList.contains('is-open')) {
         playlistComposerBackdrop.hidden = true;
       }
     }, 220);
+  }
+
+  function setPlaylistCover(url) {
+    if (playlistCoverObjectUrl) {
+      URL.revokeObjectURL(playlistCoverObjectUrl);
+      playlistCoverObjectUrl = null;
+    }
+    playlistCoverPreview.src = url;
+    playlistCoverPreview.hidden = false;
+    playlistCoverEmpty.hidden = true;
+  }
+
+  function playlistAlbumCoverChoices() {
+    const seen = new Set();
+    const choices = [];
+
+    selectedOrder.forEach(id => {
+      const track = trackById(id);
+      if (!track?.coverUrl) return;
+      const key = track.albumId || track.coverUrl;
+      if (seen.has(key)) return;
+      seen.add(key);
+      choices.push({
+        coverUrl: track.coverUrl,
+        album: track.album || '앨범',
+        artist: track.primaryArtist || track.artist || '',
+      });
+    });
+
+    return choices;
+  }
+
+  function selectedTracksForCoverSearch() {
+    return selectedOrder
+      .map(id => trackById(id))
+      .filter(Boolean)
+      .map(track => ({
+        title: track.title,
+        artist: track.artist,
+        primaryArtist: track.primaryArtist,
+        album: track.album,
+      }));
+  }
+
+  async function fetchPlaylistAlbumCoverChoices() {
+    const res = await fetch('/api/music/playlist-cover-candidates', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ tracks: selectedTracksForCoverSearch() }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || '앨범 커버 후보를 불러오지 못했어요.');
+    return Array.isArray(data.covers) ? data.covers : [];
+  }
+
+  function renderPlaylistAlbumCoverChoices(choices = playlistAlbumCoverChoices()) {
+    playlistAlbumCoverGrid.innerHTML = '';
+    playlistAlbumCoverEmpty.hidden = choices.length > 0;
+
+    choices.forEach(choice => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'playlist-album-cover-option';
+      btn.innerHTML = `
+        <img src="${choice.coverUrl}" alt="" loading="lazy" draggable="false">
+        <span>${choice.album}</span>
+      `;
+      btn.addEventListener('click', () => {
+        setPlaylistCover(choice.coverUrl);
+        playlistAlbumCoverPanel.hidden = true;
+      });
+      playlistAlbumCoverGrid.appendChild(btn);
+    });
   }
 
   function renderPlaylistComposerList() {
@@ -740,6 +828,36 @@
     playlistCoverPreview.src = playlistCoverObjectUrl;
     playlistCoverPreview.hidden = false;
     playlistCoverEmpty.hidden = true;
+    playlistCoverMenu.hidden = true;
+    playlistAlbumCoverPanel.hidden = true;
+  });
+
+  playlistCoverPicker.addEventListener('click', e => {
+    e.preventDefault();
+    playlistCoverMenu.hidden = !playlistCoverMenu.hidden;
+    if (!playlistCoverMenu.hidden) playlistAlbumCoverPanel.hidden = true;
+  });
+
+  playlistPhotoPickBtn.addEventListener('click', () => {
+    playlistCoverMenu.hidden = true;
+    playlistAlbumCoverPanel.hidden = true;
+    playlistCoverInput.click();
+  });
+
+  playlistAlbumPickBtn.addEventListener('click', async () => {
+    playlistCoverMenu.hidden = true;
+    playlistAlbumCoverPanel.hidden = false;
+    playlistAlbumCoverGrid.innerHTML = '';
+    playlistAlbumCoverEmpty.hidden = false;
+    playlistAlbumCoverEmpty.textContent = '앨범 커버를 불러오는 중...';
+
+    try {
+      const choices = await fetchPlaylistAlbumCoverChoices();
+      renderPlaylistAlbumCoverChoices(choices.length ? choices : playlistAlbumCoverChoices());
+    } catch (err) {
+      console.warn('[앨범 커버 후보 로드 실패]', err);
+      renderPlaylistAlbumCoverChoices(playlistAlbumCoverChoices());
+    }
   });
 
   playlistSaveBtn.addEventListener('click', () => {

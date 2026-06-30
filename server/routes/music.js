@@ -9,10 +9,52 @@
 //   GET  /api/music/artist/:artistId/albums — 아티스트 다른 앨범 목록 (캐러셀용)
 
 const express = require('express');
-const { interpretSearchQuery, suggestArtistAlbumNames } = require('../services/gemini');
+const { interpretSearchQuery, suggestArtistAlbumNames, suggestPlaylistCoverQueries } = require('../services/gemini');
 const { searchTracks, getAlbumTracks, getArtistAlbums, searchAlbumsByArtistAndNames } = require('../services/spotify');
 
 const router = express.Router();
+
+router.post('/playlist-cover-candidates', async (req, res, next) => {
+  try {
+    const tracks = Array.isArray(req.body?.tracks) ? req.body.tracks.slice(0, 12) : [];
+    if (tracks.length === 0) {
+      return res.json({ covers: [] });
+    }
+
+    let queries = [];
+    try {
+      queries = await suggestPlaylistCoverQueries(tracks);
+    } catch (geminiErr) {
+      console.error('[Gemini 커버 검색어 실패]', geminiErr.message);
+      queries = tracks
+        .map(track => `${track.title || ''} ${track.primaryArtist || track.artist || ''}`.trim())
+        .filter(Boolean);
+    }
+
+    const seen = new Set();
+    const covers = [];
+
+    for (const query of queries.slice(0, 12)) {
+      const foundTracks = await searchTracks(query, 1).catch(() => []);
+      const track = foundTracks[0];
+      if (!track?.coverUrl) continue;
+
+      const key = track.albumId || track.coverUrl;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      covers.push({
+        coverUrl: track.coverUrl,
+        album: track.album || track.title || '앨범',
+        artist: track.primaryArtist || track.artist || '',
+      });
+    }
+
+    res.json({ covers });
+  } catch (err) {
+    next(err);
+  }
+});
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    POST /api/music/search

@@ -164,18 +164,29 @@
       </button>
 
       <div class="playlist-composer-header">
-        <label class="playlist-cover-picker" for="playlistCoverInput" id="playlistCoverPicker">
+        <div class="playlist-cover-wrap">
           <input type="file" id="playlistCoverInput" accept="image/*" hidden>
+          <button type="button" class="playlist-cover-picker" id="playlistCoverPicker" aria-label="플레이리스트 커버 선택">
           <span class="playlist-cover-empty" id="playlistCoverEmpty">
             <svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"></path><circle cx="12" cy="13" r="4"></circle></svg>
           </span>
           <img id="playlistCoverPreview" alt="" hidden>
-        </label>
+          </button>
+          <div class="playlist-cover-menu" id="playlistCoverMenu" hidden>
+            <button type="button" id="playlistPhotoPickBtn">사진선택</button>
+            <button type="button" id="playlistAlbumPickBtn">앨범선택</button>
+          </div>
+        </div>
         <div class="playlist-title-field">
           <label for="playlistTitleInput">플레이리스트 제목</label>
           <input type="text" id="playlistTitleInput" maxlength="40" placeholder="제목 입력">
           <span class="field-error" id="playlistTitleError"></span>
         </div>
+      </div>
+
+      <div class="playlist-album-cover-panel" id="playlistAlbumCoverPanel" hidden>
+        <div class="playlist-album-cover-grid" id="playlistAlbumCoverGrid"></div>
+        <div class="playlist-album-cover-empty" id="playlistAlbumCoverEmpty" hidden>선택할 수 있는 앨범 커버가 없습니다.</div>
       </div>
 
       <div class="playlist-composer-list" id="playlistComposerList">
