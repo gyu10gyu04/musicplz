@@ -61,7 +61,16 @@
         </div>
 
         <div class="captcha-field" id="captchaField" hidden>
-          <div id="turnstileWidget"></div>
+          <div class="captcha-glass-card">
+            <div class="captcha-copy">
+              <span class="captcha-kicker">Security Check</span>
+              <strong>자동 가입을 막기 위한 확인이에요.</strong>
+              <p>한 번만 통과하면 안전하게 계속 진행할 수 있어요.</p>
+            </div>
+            <div class="turnstile-shell">
+              <div id="turnstileWidget"></div>
+            </div>
+          </div>
           <span class="field-error" id="captchaError"></span>
         </div>
 
