@@ -168,22 +168,6 @@
 
   const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const DISPLAY_NAME_RE = /^[0-9A-Za-z가-힣_.-]+$/;
-  const ALLOWED_EMAIL_DOMAINS = new Set([
-    'gmail.com',
-    'googlemail.com',
-    'naver.com',
-    'kakao.com',
-    'daum.net',
-    'hanmail.net',
-    'nate.com',
-    'outlook.com',
-    'hotmail.com',
-    'icloud.com',
-  ]);
-
-  function emailDomain(value) {
-    return value.trim().toLowerCase().split('@')[1] || '';
-  }
 
   function normalizedDisplayName() {
     return displayNameInput.value.trim().replace(/\s+/g, ' ');
@@ -211,6 +195,15 @@
   function showServerError(msg) {
     serverError.hidden = false;
     serverError.textContent = msg;
+  }
+
+  function showAuthMessageFromUrl() {
+    const verified = new URLSearchParams(location.search).get('verified');
+    if (verified === '1') {
+      showServerError('이메일 인증이 완료됐어요. 이제 로그인할 수 있습니다.');
+    } else if (verified === '0') {
+      showServerError('이메일 인증 링크가 만료됐거나 올바르지 않아요. 다시 회원가입을 시도해주세요.');
+    }
   }
 
   function loadTurnstileScript() {
@@ -303,9 +296,6 @@
     } else if (!EMAIL_RE.test(emailInput.value.trim())) {
       setFieldError(emailInput, emailError, '올바른 이메일 형식이 아니에요.');
       ok = false;
-    } else if (mode === 'signup' && !ALLOWED_EMAIL_DOMAINS.has(emailDomain(emailInput.value))) {
-      setFieldError(emailInput, emailError, 'Gmail, Naver, Kakao 등 지원하는 이메일만 사용할 수 있어요.');
-      ok = false;
     } else {
       setFieldError(emailInput, emailError, '');
     }
@@ -389,7 +379,16 @@
     setLoading(true, mode === 'login' ? '로그인 중…' : '가입 중…');
 
     try {
-      await callAuthApi(mode === 'login' ? 'login' : 'signup', payload);
+      const data = await callAuthApi(mode === 'login' ? 'login' : 'signup', payload);
+      if (mode === 'signup' && data.emailVerificationRequired) {
+        setLoading(false);
+        resetCaptcha();
+        mode = 'login';
+        applyMode();
+        showServerError(data.message || '인증 메일을 보냈어요. 메일함에서 인증을 완료한 뒤 로그인해주세요.');
+        return;
+      }
+
       // 성공 시 보라색 웨이브로 전환하며 홈으로 이동
       playWaveExit('../main/main.html');
     } catch (err) {
@@ -400,4 +399,5 @@
   });
 
   initCaptcha();
+  showAuthMessageFromUrl();
 })();

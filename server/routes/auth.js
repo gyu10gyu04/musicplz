@@ -1,7 +1,17 @@
 // routes/auth.js — 회원가입 / 로그인 / 로그아웃 / 세션 확인 라우트
 const express = require('express');
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
-const { createUser, findByEmail, findById, findByDisplayName } = require('../models/users');
+const {
+  createUser,
+  findByEmail,
+  findById,
+  findByDisplayName,
+  createEmailVerificationToken,
+  deletePendingEmailVerificationTokens,
+  verifyEmailByTokenHash,
+} = require('../models/users');
+const { isEmailEnabled, sendVerificationEmail } = require('../services/email');
 
 const router = express.Router();
 
@@ -11,18 +21,7 @@ const BCRYPT_ROUNDS = 10;
 const PG_UNIQUE_VIOLATION = '23505';
 const MAX_PASSWORD_LENGTH = 72; // bcrypt는 72바이트 이후를 무시하므로 길이를 제한합니다.
 const DISPLAY_NAME_RE = /^[0-9A-Za-z가-힣_.-]+$/;
-const ALLOWED_EMAIL_DOMAINS = new Set([
-  'gmail.com',
-  'googlemail.com',
-  'naver.com',
-  'kakao.com',
-  'daum.net',
-  'hanmail.net',
-  'nate.com',
-  'outlook.com',
-  'hotmail.com',
-  'icloud.com',
-]);
+const EMAIL_VERIFICATION_TTL_MS = 30 * 60 * 1000;
 
 const authBuckets = new Map();
 
@@ -61,14 +60,6 @@ function normalizeEmail(email) {
   return String(email || '').trim().toLowerCase();
 }
 
-function emailDomain(email) {
-  return normalizeEmail(email).split('@')[1] || '';
-}
-
-function isAllowedEmailDomain(email) {
-  return ALLOWED_EMAIL_DOMAINS.has(emailDomain(email));
-}
-
 function validatePassword(password) {
   const value = String(password || '');
   if (value.length < 8) return '비밀번호는 8자 이상이어야 해요.';
@@ -101,6 +92,35 @@ function establishSession(req, userId) {
       req.session.userId = userId;
       resolve();
     });
+  });
+}
+
+function tokenHash(token) {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+function baseUrl(req) {
+  return (process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
+}
+
+async function sendEmailVerification(req, user) {
+  if (!isEmailEnabled()) {
+    throw new Error('RESEND_API_KEY 또는 EMAIL_FROM 환경 변수가 설정되어 있지 않습니다.');
+  }
+
+  const token = crypto.randomBytes(32).toString('hex');
+  await deletePendingEmailVerificationTokens(user.id);
+  await createEmailVerificationToken({
+    userId: user.id,
+    tokenHash: tokenHash(token),
+    expiresAt: new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS),
+  });
+
+  const verifyUrl = `${baseUrl(req)}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
+  await sendVerificationEmail({
+    to: user.email,
+    displayName: user.display_name,
+    verifyUrl,
   });
 }
 
@@ -163,10 +183,6 @@ router.post('/signup', authRateLimit({ windowMs: 15 * 60 * 1000, max: 10, keyPre
       return res.status(400).json({ error: '올바른 이메일을 입력해주세요.' });
     }
 
-    if (!isAllowedEmailDomain(normalizedEmail)) {
-      return res.status(400).json({ error: 'Gmail, Naver, Kakao 등 지원하는 이메일로만 가입할 수 있어요.' });
-    }
-
     const passwordError = validatePassword(password);
     if (passwordError) {
       return res.status(400).json({ error: passwordError });
@@ -180,6 +196,13 @@ router.post('/signup', authRateLimit({ windowMs: 15 * 60 * 1000, max: 10, keyPre
 
     const existing = await findByEmail(normalizedEmail);
     if (existing) {
+      if (!existing.email_verified) {
+        await sendEmailVerification(req, existing);
+        return res.status(202).json({
+          emailVerificationRequired: true,
+          message: '이미 가입 대기 중인 이메일이에요. 인증 메일을 다시 보냈어요.',
+        });
+      }
       return res.status(409).json({ error: '이미 가입된 이메일이에요.' });
     }
 
@@ -207,8 +230,29 @@ router.post('/signup', authRateLimit({ windowMs: 15 * 60 * 1000, max: 10, keyPre
       throw dbErr;
     }
 
-    await establishSession(req, user.id);
-    res.status(201).json({ user: publicUser(user) });
+    await sendEmailVerification(req, user);
+    res.status(201).json({
+      emailVerificationRequired: true,
+      message: '인증 메일을 보냈어요. 메일함에서 인증을 완료한 뒤 로그인해주세요.',
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/verify-email', async (req, res, next) => {
+  try {
+    const token = String(req.query.token || '').trim();
+    if (!token) {
+      return res.redirect('/login/login.html?verified=0');
+    }
+
+    const user = await verifyEmailByTokenHash(tokenHash(token));
+    if (!user) {
+      return res.redirect('/login/login.html?verified=0');
+    }
+
+    res.redirect('/login/login.html?verified=1');
   } catch (err) {
     next(err);
   }
@@ -236,6 +280,10 @@ router.post('/login',
 
     if (!user) {
       return res.status(401).json({ error: INVALID });
+    }
+
+    if (!user.email_verified) {
+      return res.status(403).json({ error: '이메일 인증을 완료한 뒤 로그인해주세요.' });
     }
 
     const ok = await bcrypt.compare(String(password), user.password_hash);
