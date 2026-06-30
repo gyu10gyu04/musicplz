@@ -574,13 +574,17 @@
         timer: window.setTimeout(() => {
           if (!activeSortDrag || activeSortDrag.item !== item) return;
           const children = [...listEl.querySelectorAll(itemSelector)];
+          const containerRect = listEl.getBoundingClientRect();
           activeSortDrag.active = true;
+          activeSortDrag.children = children;
+          activeSortDrag.containerTop = containerRect.top;
           activeSortDrag.positions = children.map(child => ({
             top: child.offsetTop,
             mid: child.offsetTop + child.offsetHeight / 2,
             height: child.offsetHeight,
           }));
           activeSortDrag.shiftY = (children[index]?.offsetHeight || 70) + 12;
+          activeSortDrag.lastTargetIdx = index;
           item.classList.remove('is-pressing');
           item.classList.add('is-dragging');
           listEl.classList.add('is-sorting');
@@ -605,11 +609,8 @@
       }
 
       e.preventDefault();
-      item.style.transform = `translate3d(${dx}px, ${dy}px, 0) scale(1.02)`;
-
-      const children = [...listEl.querySelectorAll(itemSelector)];
-      const containerRect = listEl.getBoundingClientRect();
-      const relativeY = e.clientY - containerRect.top + listEl.scrollTop;
+      const children = activeSortDrag.children;
+      const relativeY = e.clientY - activeSortDrag.containerTop + listEl.scrollTop;
 
       let nextTargetIdx = activeSortDrag.index;
       let minDist = Infinity;
@@ -623,6 +624,11 @@
 
       activeSortDrag.targetIdx = nextTargetIdx;
       const shiftY = activeSortDrag.shiftY || ((children[0]?.offsetHeight || 70) + 12);
+
+      item.style.transform = `translate3d(${dx}px, ${dy}px, 0) scale(1.02)`;
+
+      if (activeSortDrag.lastTargetIdx === nextTargetIdx) return;
+      activeSortDrag.lastTargetIdx = nextTargetIdx;
 
       children.forEach((child, i) => {
         if (child === item) return;

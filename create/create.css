@@ -708,6 +708,8 @@ nav{
   filter: none !important;
   z-index: 10;
   cursor: grabbing;
+  transition: none !important;
+  will-change: transform;
 }
 
 .selected-tracks-modal-list.is-sorting .selected-track-item:not(.is-dragging) {
@@ -903,6 +905,8 @@ nav{
   filter: none !important;
   z-index: 10;
   cursor: grabbing;
+  transition: none !important;
+  will-change: transform;
 }
 .playlist-composer-list.is-sorting .composer-track-item:not(.is-dragging) {
   opacity: 0.55;
