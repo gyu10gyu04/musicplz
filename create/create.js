@@ -577,80 +577,6 @@
 
   let draggedIdx = null;
   let targetIdx = null;
-  let touchSort = null;
-  let selectedTracksDragoverBound = false;
-
-  function clearSelectedTrackTransforms() {
-    [...selectedTracksModalList.children].forEach(child => {
-      child.style.transform = '';
-    });
-  }
-
-  function updateSelectedTrackTarget(clientY) {
-    if (draggedIdx === null) return;
-
-    const children = [...selectedTracksModalList.children];
-    const containerRect = selectedTracksModalList.getBoundingClientRect();
-    const relativeY = clientY - containerRect.top + selectedTracksModalList.scrollTop;
-
-    let tempTarget = draggedIdx;
-    let minDist = Infinity;
-
-    children.forEach((child, k) => {
-      const childMidY = child.offsetTop + child.offsetHeight / 2;
-      const d = Math.abs(relativeY - childMidY);
-      if (d < minDist) {
-        minDist = d;
-        tempTarget = k;
-      }
-    });
-
-    targetIdx = tempTarget;
-    const firstItem = children.find(child => child.classList?.contains('selected-track-item'));
-    const shiftY = (firstItem?.offsetHeight || 70) + 12;
-
-    children.forEach((child, k) => {
-      if (k === draggedIdx) return;
-      child.style.transform = '';
-
-      if (draggedIdx < targetIdx) {
-        if (k > draggedIdx && k <= targetIdx) child.style.transform = `translateY(-${shiftY}px)`;
-      } else if (draggedIdx > targetIdx) {
-        if (k >= targetIdx && k < draggedIdx) child.style.transform = `translateY(${shiftY}px)`;
-      }
-    });
-  }
-
-  function finishSelectedTrackSort() {
-    if (targetIdx !== null && draggedIdx !== null && targetIdx !== draggedIdx) {
-      const [removed] = selectedOrder.splice(draggedIdx, 1);
-      selectedOrder.splice(targetIdx, 0, removed);
-      renderSelectedTracksList();
-      renderTray();
-    }
-  }
-
-  function resetSelectedTrackSort() {
-    selectedTracksModalList.classList.remove('is-sorting');
-    document.body.classList.remove('is-touch-sorting');
-    selectedTracksModalList.querySelectorAll('.selected-track-item.is-dragging').forEach(item => {
-      item.classList.remove('is-dragging');
-    });
-    clearSelectedTrackTransforms();
-    draggedIdx = null;
-    targetIdx = null;
-  }
-
-  function cancelTouchSortTimer() {
-    if (!touchSort?.timer) return;
-    window.clearTimeout(touchSort.timer);
-    touchSort.timer = null;
-  }
-
-  function cleanupTouchSort() {
-    cancelTouchSortTimer();
-    touchSort = null;
-  }
 
   function renderSelectedTracksList() {
     selectedTracksModalList.innerHTML = '';
@@ -690,66 +616,28 @@
       // 드래그앤드롭 이벤트 리스너
       item.addEventListener('dragstart', (e) => {
         draggedIdx = i;
-        targetIdx = i;
         item.classList.add('is-dragging');
         e.dataTransfer.effectAllowed = 'move';
         selectedTracksModalList.classList.add('is-sorting');
       });
 
       item.addEventListener('dragend', () => {
-        finishSelectedTrackSort();
-        resetSelectedTrackSort();
-      });
+        item.classList.remove('is-dragging');
+        selectedTracksModalList.classList.remove('is-sorting');
 
-      item.addEventListener('touchstart', (e) => {
-        if (e.target.closest('.selected-track-remove')) return;
-        const t = e.touches[0];
-        touchSort = {
-          item,
-          index: i,
-          startX: t.clientX,
-          startY: t.clientY,
-          active: false,
-          timer: window.setTimeout(() => {
-            draggedIdx = i;
-            targetIdx = i;
-            touchSort.active = true;
-            item.classList.add('is-dragging');
-            selectedTracksModalList.classList.add('is-sorting');
-            document.body.classList.add('is-touch-sorting');
-          }, 180),
-        };
-      }, { passive: true });
+        // 모든 변형 속성 초기화
+        const children = [...selectedTracksModalList.children];
+        children.forEach(child => child.style.transform = '');
 
-      item.addEventListener('touchmove', (e) => {
-        if (!touchSort || touchSort.item !== item) return;
-        const t = e.touches[0];
-        const dx = Math.abs(t.clientX - touchSort.startX);
-        const dy = Math.abs(t.clientY - touchSort.startY);
-
-        if (!touchSort.active) {
-          if (dx > 10 || dy > 10) cleanupTouchSort();
-          return;
+        if (targetIdx !== null && targetIdx !== draggedIdx) {
+          const [removed] = selectedOrder.splice(draggedIdx, 1);
+          selectedOrder.splice(targetIdx, 0, removed);
+          renderSelectedTracksList();
+          renderTray();
         }
-
-        e.preventDefault();
-        updateSelectedTrackTarget(t.clientY);
-      }, { passive: false });
-
-      item.addEventListener('touchend', () => {
-        if (!touchSort || touchSort.item !== item) return;
-        const wasActive = touchSort.active;
-        cleanupTouchSort();
-        if (wasActive) finishSelectedTrackSort();
-        resetSelectedTrackSort();
+        draggedIdx = null;
+        targetIdx = null;
       });
-
-      item.addEventListener('touchcancel', () => {
-        cleanupTouchSort();
-        resetSelectedTrackSort();
-      });
-
-      item.addEventListener('contextmenu', e => e.preventDefault());
 
       item.querySelector('.selected-track-remove').addEventListener('click', (e) => {
         e.stopPropagation();
@@ -760,14 +648,46 @@
       selectedTracksModalList.appendChild(item);
     });
 
-    if (!selectedTracksDragoverBound) {
-      selectedTracksDragoverBound = true;
-      selectedTracksModalList.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        if (draggedIdx === null) return;
-        updateSelectedTrackTarget(e.clientY);
+    // 벌어지는 애니메이션 처리를 위한 컨테이너 드래그오버 리스너 (레이아웃 고정형 offsetTop 기반)
+    selectedTracksModalList.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (draggedIdx === null) return;
+
+      const children = [...selectedTracksModalList.children];
+      const containerRect = selectedTracksModalList.getBoundingClientRect();
+      const relativeY = e.clientY - containerRect.top + selectedTracksModalList.scrollTop;
+
+      let tempTarget = draggedIdx;
+      let minDist = Infinity;
+
+      // offsetTop은 transform: translateY의 영향을 받지 않는 절대 위치이므로 계산에 완벽한 무결성을 지닙니다.
+      children.forEach((child, k) => {
+        const childMidY = child.offsetTop + child.offsetHeight / 2;
+        const d = Math.abs(relativeY - childMidY);
+        if (d < minDist) {
+          minDist = d;
+          tempTarget = k;
+        }
       });
-    }
+
+      targetIdx = tempTarget;
+
+      // 드래그 위치에 맞추어 카드들이 벌어지는 느낌의 CSS Transform 동적 계산 적용
+      children.forEach((child, k) => {
+        if (k === draggedIdx) return;
+        child.style.transform = '';
+
+        if (draggedIdx < targetIdx) {
+          if (k > draggedIdx && k <= targetIdx) {
+            child.style.transform = 'translateY(-82px)'; // Item height 70px + gap 12px
+          }
+        } else if (draggedIdx > targetIdx) {
+          if (k >= targetIdx && k < draggedIdx) {
+            child.style.transform = 'translateY(82px)';
+          }
+        }
+      });
+    });
   }
 
   selectedTracksModalClose.addEventListener('click', closeSelectedTracksModal);

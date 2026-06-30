@@ -9,7 +9,7 @@
 //   GET  /api/music/artist/:artistId/albums — 아티스트 다른 앨범 목록 (캐러셀용)
 
 const express = require('express');
-const { interpretSearchQuery, suggestArtistAlbumNames, restoreKoreanTrackTitles } = require('../services/gemini');
+const { interpretSearchQuery, suggestArtistAlbumNames } = require('../services/gemini');
 const { searchTracks, getAlbumTracks, getArtistAlbums, searchAlbumsByArtistAndNames } = require('../services/spotify');
 
 const router = express.Router();
@@ -40,13 +40,7 @@ router.post('/search', async (req, res, next) => {
       };
     }
 
-    let tracks = await searchTracks(interpretation.searchQuery, 10);
-
-    try {
-      tracks = await restoreKoreanTrackTitles(tracks);
-    } catch (geminiErr) {
-      console.error('[Gemini 제목 보정 실패]', geminiErr.message);
-    }
+    const tracks = await searchTracks(interpretation.searchQuery, 10);
 
     console.log(`[검색 결과] "${interpretation.searchQuery}" → ${tracks.length}곡:`,
       tracks.map(t => `${t.title}(artistId=${t.artistId})`).join(' / '));
@@ -72,13 +66,7 @@ router.get('/album/:albumId', async (req, res, next) => {
     const { albumId } = req.params;
     const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
 
-    let { tracks, total, hasMore, album } = await getAlbumTracks(albumId, offset, 20);
-
-    try {
-      tracks = await restoreKoreanTrackTitles(tracks);
-    } catch (geminiErr) {
-      console.error('[Gemini 앨범 트랙 제목 보정 실패]', geminiErr.message);
-    }
+    const { tracks, total, hasMore, album } = await getAlbumTracks(albumId, offset, 20);
 
     // 대표곡 = popularity 가장 높은 트랙 (첫 페이지 응답 기준으로 사용 권장)
     const representativeTrack = tracks.reduce(
