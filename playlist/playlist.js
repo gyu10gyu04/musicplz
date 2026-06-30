@@ -15,18 +15,27 @@
 
   let sort = 'latest';
   let currentPlaylist = null;
+  const savedOnly = new URLSearchParams(location.search).get('saved') === '1';
 
   async function loadList() {
     const params = new URLSearchParams({ sort });
     const q = playlistSearch.value.trim();
     if (q) params.set('q', q);
+    if (savedOnly) params.set('saved', '1');
 
     const res = await fetch(`/api/playlists?${params}`, { credentials: 'same-origin' });
     const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      playlistGrid.innerHTML = '';
+      emptyState.hidden = false;
+      emptyState.textContent = data.error || '플레이리스트를 불러오지 못했어요.';
+      return;
+    }
     const playlists = Array.isArray(data.playlists) ? data.playlists : [];
 
     playlistGrid.innerHTML = '';
     emptyState.hidden = playlists.length > 0;
+    emptyState.textContent = savedOnly ? '저장한 플레이리스트가 없습니다.' : '아직 보여줄 플레이리스트가 없습니다.';
     playlists.forEach(playlist => playlistGrid.appendChild(renderCard(playlist)));
   }
 

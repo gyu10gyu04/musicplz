@@ -528,6 +528,7 @@
         </button>
         <div class="nav-dropdown" id="navDropdown" role="menu" hidden>
           <a href="#" class="nav-dropdown-item" data-action="profile" role="menuitem">프로필</a>
+          <a href="../playlist/playlist.html?saved=1" class="nav-dropdown-item" data-action="library" role="menuitem">보관함</a>
           <a href="#" class="nav-dropdown-item" data-action="settings" role="menuitem">설정</a>
           <div class="nav-dropdown-divider"></div>
           <button type="button" class="nav-dropdown-item nav-dropdown-item--danger" id="navLogoutBtn" role="menuitem">로그아웃</button>
@@ -564,12 +565,12 @@
       if (e.key === 'Escape' && !dropdown.hidden) closeDropdown();
     });
 
-    // 프로필/설정: 아직 해당 페이지가 없으므로 현재는 자리만 마련해둠
     dropdown.querySelectorAll('[data-action]').forEach(item => {
       item.addEventListener('click', e => {
-        e.preventDefault();
         closeDropdown();
-        // TODO: 프로필/설정 페이지가 만들어지면 여기서 이동 처리
+        if (item.dataset.action !== 'library') {
+          e.preventDefault();
+        }
       });
     });
 
@@ -601,6 +602,7 @@
 
   /* ─── 초기화 ─── */
   initCardHover();
+  loadFeaturedPlaylists();
   recalculate();
   requestAnimationFrame(tick);
 })();
