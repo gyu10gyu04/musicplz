@@ -1,14 +1,16 @@
 // routes/auth.js — 회원가입 / 로그인 / 로그아웃 / 세션 확인 라우트
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const { createUser, findByEmail, findById } = require('../models/users');
+const { createUser, findByEmail, findById, findByDisplayName } = require('../models/users');
 
 const router = express.Router();
 
+const TURNSTILE_VERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const BCRYPT_ROUNDS = 10;
 const PG_UNIQUE_VIOLATION = '23505';
 const MAX_PASSWORD_LENGTH = 72; // bcrypt는 72바이트 이후를 무시하므로 길이를 제한합니다.
+const DISPLAY_NAME_RE = /^[0-9A-Za-z가-힣_.-]+$/;
 const ALLOWED_EMAIL_DOMAINS = new Set([
   'gmail.com',
   'googlemail.com',
@@ -77,6 +79,21 @@ function validatePassword(password) {
   return null;
 }
 
+function normalizeDisplayName(displayName) {
+  return String(displayName || '').trim().replace(/\s+/g, ' ');
+}
+
+function validateDisplayName(displayName) {
+  const value = normalizeDisplayName(displayName);
+  if (!value) return '닉네임을 입력해주세요.';
+  if (value.length < 2) return '닉네임은 2자 이상이어야 해요.';
+  if (value.length > 20) return '닉네임은 20자 이하로 입력해주세요.';
+  if (!DISPLAY_NAME_RE.test(value)) {
+    return '닉네임은 한글, 영문, 숫자, _, ., - 만 사용할 수 있어요.';
+  }
+  return null;
+}
+
 function establishSession(req, userId) {
   return new Promise((resolve, reject) => {
     req.session.regenerate(err => {
@@ -87,12 +104,56 @@ function establishSession(req, userId) {
   });
 }
 
+async function verifyTurnstile(req, res, next) {
+  const secretKey = process.env.TURNSTILE_SECRET_KEY;
+  const siteKey = process.env.TURNSTILE_SITE_KEY;
+  if (!secretKey || !siteKey) return next();
+
+  const token = String(req.body?.turnstileToken || '').trim();
+  if (!token) {
+    return res.status(400).json({ error: '보안 확인을 완료해주세요.' });
+  }
+
+  try {
+    const verifyRes = await fetch(TURNSTILE_VERIFY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        secret: secretKey,
+        response: token,
+        remoteip: req.ip,
+      }),
+    });
+
+    if (!verifyRes.ok) {
+      return res.status(502).json({ error: '보안 확인 서버에 연결할 수 없어요. 잠시 후 다시 시도해주세요.' });
+    }
+
+    const data = await verifyRes.json();
+    if (!data.success) {
+      return res.status(400).json({ error: '보안 확인에 실패했어요. 다시 시도해주세요.' });
+    }
+
+    next();
+  } catch (err) {
+    next(err);
+  }
+}
+
 function publicUser(user) {
   if (!user) return null;
   return { id: user.id, email: user.email, displayName: user.display_name };
 }
 
-router.post('/signup', authRateLimit({ windowMs: 15 * 60 * 1000, max: 10, keyPrefix: 'signup' }), async (req, res, next) => {
+router.get('/security-config', (req, res) => {
+  const siteKey = process.env.TURNSTILE_SITE_KEY || '';
+  res.json({
+    turnstileEnabled: Boolean(process.env.TURNSTILE_SECRET_KEY && siteKey),
+    turnstileSiteKey: siteKey,
+  });
+});
+
+router.post('/signup', authRateLimit({ windowMs: 15 * 60 * 1000, max: 10, keyPrefix: 'signup' }), verifyTurnstile, async (req, res, next) => {
   try {
     const { email, password, displayName } = req.body || {};
 
@@ -111,9 +172,20 @@ router.post('/signup', authRateLimit({ windowMs: 15 * 60 * 1000, max: 10, keyPre
       return res.status(400).json({ error: passwordError });
     }
 
+    const normalizedDisplayName = normalizeDisplayName(displayName);
+    const displayNameError = validateDisplayName(normalizedDisplayName);
+    if (displayNameError) {
+      return res.status(400).json({ error: displayNameError });
+    }
+
     const existing = await findByEmail(normalizedEmail);
     if (existing) {
       return res.status(409).json({ error: '이미 가입된 이메일이에요.' });
+    }
+
+    const existingDisplayName = await findByDisplayName(normalizedDisplayName);
+    if (existingDisplayName) {
+      return res.status(409).json({ error: '이미 사용 중인 닉네임이에요.' });
     }
 
     const passwordHash = await bcrypt.hash(String(password), BCRYPT_ROUNDS);
@@ -123,10 +195,13 @@ router.post('/signup', authRateLimit({ windowMs: 15 * 60 * 1000, max: 10, keyPre
       user = await createUser({
         email: normalizedEmail,
         passwordHash,
-        displayName: displayName ? String(displayName).trim().slice(0, 40) : null,
+        displayName: normalizedDisplayName,
       });
     } catch (dbErr) {
       if (dbErr.code === PG_UNIQUE_VIOLATION) {
+        if (dbErr.constraint === 'users_display_name_lower_unique') {
+          return res.status(409).json({ error: '이미 사용 중인 닉네임이에요.' });
+        }
         return res.status(409).json({ error: '이미 가입된 이메일이에요.' });
       }
       throw dbErr;
@@ -142,6 +217,7 @@ router.post('/signup', authRateLimit({ windowMs: 15 * 60 * 1000, max: 10, keyPre
 router.post('/login',
   authRateLimit({ windowMs: 15 * 60 * 1000, max: 30, keyPrefix: 'login-ip' }),
   authRateLimit({ windowMs: 15 * 60 * 1000, max: 8, keyPrefix: 'login-email', includeEmail: true }),
+  verifyTurnstile,
   async (req, res, next) => {
   try {
     const { email, password } = req.body || {};

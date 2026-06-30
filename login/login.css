@@ -134,6 +134,13 @@ form{display:flex;flex-direction:column;gap:18px;}
 }
 .forgot-link:hover{color:#6d28d9;text-decoration:underline;}
 
+.captcha-field{
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+  min-height:70px;
+}
+.captcha-field[hidden]{display:none;}
+#turnstileWidget{min-height:65px;}
+
 .cta-btn{
   display:inline-flex;align-items:center;justify-content:center;gap:6px;
   padding:14px 26px;

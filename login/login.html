@@ -25,7 +25,8 @@
       <form id="authForm" novalidate>
         <div class="field" id="nameField" hidden>
           <label for="displayName">닉네임</label>
-          <input type="text" id="displayName" name="displayName" placeholder="플레이리스트에 표시될 이름" autocomplete="nickname" maxlength="40">
+          <input type="text" id="displayName" name="displayName" placeholder="플레이리스트에 표시될 이름" autocomplete="nickname" maxlength="20">
+          <span class="field-error" id="displayNameError"></span>
         </div>
 
         <div class="field">
@@ -51,6 +52,11 @@
             <span>로그인 상태 유지</span>
           </label>
           <a href="#" class="forgot-link">비밀번호를 잊으셨나요?</a>
+        </div>
+
+        <div class="captcha-field" id="captchaField" hidden>
+          <div id="turnstileWidget"></div>
+          <span class="field-error" id="captchaError"></span>
         </div>
 
         <button type="submit" class="cta-btn purple submit-btn" id="submitBtn">

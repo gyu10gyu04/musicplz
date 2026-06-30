@@ -37,6 +37,16 @@ async function initSchema() {
       created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `);
+  try {
+    await pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS users_display_name_lower_unique
+      ON users (lower(btrim(display_name)))
+      WHERE display_name IS NOT NULL;
+    `);
+  } catch (err) {
+    if (err.code !== '23505') throw err;
+    console.warn('[경고] 기존 users 데이터에 중복 닉네임이 있어 닉네임 유니크 인덱스를 만들지 못했습니다. 중복 데이터를 정리해주세요.');
+  }
   // express-session용 세션 테이블(session)은 connect-pg-simple이 자동으로 생성합니다.
 }
 

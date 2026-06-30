@@ -20,6 +20,15 @@ async function findByEmail(email) {
   return rows[0] || null;
 }
 
+async function findByDisplayName(displayName) {
+  const { rows } = await pool.query(
+    `SELECT id, email, display_name, created_at
+     FROM users WHERE lower(btrim(display_name)) = lower(btrim($1))`,
+    [displayName]
+  );
+  return rows[0] || null;
+}
+
 async function findById(id) {
   const { rows } = await pool.query(
     `SELECT id, email, display_name, created_at
@@ -29,4 +38,4 @@ async function findById(id) {
   return rows[0] || null;
 }
 
-module.exports = { createUser, findByEmail, findById };
+module.exports = { createUser, findByEmail, findById, findByDisplayName };

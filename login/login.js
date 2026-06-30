@@ -100,6 +100,7 @@
   const submitLabel      = document.getElementById('submitLabel');
   const modeSwitchPrompt = document.getElementById('modeSwitchPrompt');
   const displayNameInput = document.getElementById('displayName');
+  const displayNameError = document.getElementById('displayNameError');
 
   function applyMode() {
     if (mode === 'login') {
@@ -157,8 +158,16 @@
   const passwordError = document.getElementById('passwordError');
   const submitBtn     = document.getElementById('submitBtn');
   const serverError   = document.getElementById('serverError');
+  const captchaField  = document.getElementById('captchaField');
+  const captchaError  = document.getElementById('captchaError');
+  const turnstileWidget = document.getElementById('turnstileWidget');
+
+  let turnstileEnabled = false;
+  let turnstileWidgetId = null;
+  let turnstileToken = '';
 
   const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const DISPLAY_NAME_RE = /^[0-9A-Za-z가-힣_.-]+$/;
   const ALLOWED_EMAIL_DOMAINS = new Set([
     'gmail.com',
     'googlemail.com',
@@ -176,6 +185,10 @@
     return value.trim().toLowerCase().split('@')[1] || '';
   }
 
+  function normalizedDisplayName() {
+    return displayNameInput.value.trim().replace(/\s+/g, ' ');
+  }
+
   function setFieldError(input, errorEl, msg) {
     input.classList.toggle('has-error', !!msg);
     errorEl.textContent = msg || '';
@@ -184,6 +197,11 @@
   function clearServerError() {
     serverError.hidden = true;
     serverError.textContent = '';
+  }
+
+  function setCaptchaError(msg) {
+    if (!captchaError) return;
+    captchaError.textContent = msg || '';
   }
 
   // 정적 HTML은 로그인 모드 기준으로 작성돼 있으므로,
@@ -195,8 +213,89 @@
     serverError.textContent = msg;
   }
 
+  function loadTurnstileScript() {
+    return new Promise((resolve, reject) => {
+      if (window.turnstile) return resolve();
+
+      const existing = document.querySelector('script[data-turnstile]');
+      if (existing) {
+        existing.addEventListener('load', () => resolve(), { once: true });
+        existing.addEventListener('error', reject, { once: true });
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+      script.async = true;
+      script.defer = true;
+      script.dataset.turnstile = '1';
+      script.onload = () => resolve();
+      script.onerror = reject;
+      document.head.appendChild(script);
+    });
+  }
+
+  async function initCaptcha() {
+    try {
+      const res = await fetch('/api/auth/security-config', { credentials: 'same-origin' });
+      const config = await res.json();
+      if (!config.turnstileEnabled || !config.turnstileSiteKey) return;
+
+      turnstileEnabled = true;
+      captchaField.hidden = false;
+      await loadTurnstileScript();
+
+      turnstileWidgetId = window.turnstile.render(turnstileWidget, {
+        sitekey: config.turnstileSiteKey,
+        theme: 'light',
+        callback: token => {
+          turnstileToken = token;
+          setCaptchaError('');
+        },
+        'expired-callback': () => {
+          turnstileToken = '';
+          setCaptchaError('보안 확인이 만료됐어요. 다시 확인해주세요.');
+        },
+        'error-callback': () => {
+          turnstileToken = '';
+          setCaptchaError('보안 확인을 불러오지 못했어요. 새로고침 후 다시 시도해주세요.');
+        },
+      });
+    } catch (err) {
+      turnstileEnabled = false;
+      captchaField.hidden = true;
+      console.warn('[Turnstile 초기화 실패]', err);
+    }
+  }
+
+  function resetCaptcha() {
+    turnstileToken = '';
+    if (turnstileEnabled && window.turnstile && turnstileWidgetId !== null) {
+      window.turnstile.reset(turnstileWidgetId);
+    }
+  }
+
   function validate() {
     let ok = true;
+
+    if (mode === 'signup') {
+      const displayName = normalizedDisplayName();
+      if (!displayName) {
+        setFieldError(displayNameInput, displayNameError, '닉네임을 입력해주세요.');
+        ok = false;
+      } else if (displayName.length < 2) {
+        setFieldError(displayNameInput, displayNameError, '닉네임은 2자 이상이어야 해요.');
+        ok = false;
+      } else if (displayName.length > 20) {
+        setFieldError(displayNameInput, displayNameError, '닉네임은 20자 이하로 입력해주세요.');
+        ok = false;
+      } else if (!DISPLAY_NAME_RE.test(displayName)) {
+        setFieldError(displayNameInput, displayNameError, '닉네임은 한글, 영문, 숫자, _, ., - 만 사용할 수 있어요.');
+        ok = false;
+      } else {
+        setFieldError(displayNameInput, displayNameError, '');
+      }
+    }
 
     if (!emailInput.value.trim()) {
       setFieldError(emailInput, emailError, '이메일을 입력해주세요.');
@@ -227,12 +326,17 @@
       setFieldError(pwInput, passwordError, '');
     }
 
+    if (turnstileEnabled && !turnstileToken) {
+      setCaptchaError('보안 확인을 완료해주세요.');
+      ok = false;
+    }
+
     return ok;
   }
 
-  [emailInput, pwInput].forEach(input => {
+  [displayNameInput, emailInput, pwInput].forEach(input => {
     input.addEventListener('input', () => {
-      const errEl = input === emailInput ? emailError : passwordError;
+      const errEl = input === displayNameInput ? displayNameError : input === emailInput ? emailError : passwordError;
       setFieldError(input, errEl, '');
       clearServerError();
     });
@@ -275,8 +379,11 @@
       email: emailInput.value.trim(),
       password: pwInput.value,
     };
+    if (turnstileEnabled) {
+      payload.turnstileToken = turnstileToken;
+    }
     if (mode === 'signup') {
-      payload.displayName = displayNameInput.value.trim();
+      payload.displayName = normalizedDisplayName();
     }
 
     setLoading(true, mode === 'login' ? '로그인 중…' : '가입 중…');
@@ -287,7 +394,10 @@
       playWaveExit('../main/main.html');
     } catch (err) {
       setLoading(false);
+      resetCaptcha();
       showServerError(err.message);
     }
   });
+
+  initCaptcha();
 })();
