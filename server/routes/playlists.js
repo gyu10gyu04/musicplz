@@ -5,6 +5,7 @@ const {
   getPlaylistById,
   togglePlaylistLike,
   togglePlaylistSave,
+  deletePlaylist,
 } = require('../models/playlists');
 
 const router = express.Router();
@@ -97,6 +98,20 @@ router.post('/:playlistId/save', requireLogin, async (req, res, next) => {
     const saved = await togglePlaylistSave({ playlistId, userId: req.session.userId });
     const playlist = await getPlaylistById({ playlistId, userId: req.session.userId });
     res.json({ saved, playlist });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.delete('/:playlistId', requireLogin, async (req, res, next) => {
+  try {
+    const playlistId = Number(req.params.playlistId);
+    if (!Number.isInteger(playlistId)) return res.status(400).json({ error: '올바르지 않은 플레이리스트입니다.' });
+
+    const deleted = await deletePlaylist({ playlistId, userId: req.session.userId });
+    if (!deleted) return res.status(403).json({ error: '이 플레이리스트를 삭제할 권한이 없습니다.' });
+
+    res.json({ ok: true });
   } catch (err) {
     next(err);
   }

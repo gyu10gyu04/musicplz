@@ -10,7 +10,12 @@
   <div class="noise-layer"></div>
 
   <nav>
-    <a href="../main/main.html" class="logo">Music<span class="logo-dot">Plz</span></a>
+    <a href="../main/main.html" class="logo" aria-label="MusicPlz">
+      <svg width="102.82" height="17.20" viewBox="0 0 103 18" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <text x="0" y="14" font-size="17" font-weight="900" letter-spacing="-1.1" fill="#0a0a0a">Music</text>
+        <text x="53" y="14" font-size="17" font-weight="900" letter-spacing="-1.1" fill="#7c3aed">Plz</text>
+      </svg>
+    </a>
     <a href="../create/create.html" class="nav-create">플레이리스트 만들기</a>
   </nav>
 
@@ -49,6 +54,27 @@
       <div class="detail-track-list" id="detailTrackList"></div>
     </section>
   </main>
+
+  <div class="quick-card-backdrop" id="quickCardBackdrop" hidden>
+    <div class="quick-card" id="quickCard">
+      <button type="button" class="quick-card-close" id="quickCardClose" aria-label="닫기">×</button>
+      <img id="quickCover" alt="" class="quick-cover">
+      <div class="quick-meta">
+        <p class="tagline">Playlist Info</p>
+        <h2 id="quickTitle"></h2>
+        <p id="quickOwner"></p>
+        <div class="quick-stats" id="quickStats"></div>
+        <div class="quick-owner-actions" id="quickOwnerActions" hidden>
+          <button type="button" id="quickEditBtn">수정</button>
+          <button type="button" id="quickDeleteBtn" class="danger">삭제</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <svg class="wave-transition" id="waveTransition" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+    <path id="wavePath" d="M0,100 L0,100 C25,100 75,100 100,100 L100,100 Z"></path>
+  </svg>
 
   <script src="playlist.js"></script>
 </body>

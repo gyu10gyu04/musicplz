@@ -67,8 +67,9 @@ async function listPlaylists({ query = '', sort = 'latest', userId = null, saved
     : 'p.created_at DESC';
 
   const { rows } = await pool.query(
-    `SELECT
+     `SELECT
        p.id,
+       p.user_id,
        p.title,
        p.cover_url,
        p.created_at,
@@ -90,13 +91,14 @@ async function listPlaylists({ query = '', sort = 'latest', userId = null, saved
     values
   );
 
-  return rows.map(publicPlaylistRow);
+  return rows.map(row => publicPlaylistRow(row, userId));
 }
 
 async function getPlaylistById({ playlistId, userId = null }) {
   const playlistResult = await pool.query(
-    `SELECT
+     `SELECT
        p.id,
+       p.user_id,
        p.title,
        p.cover_url,
        p.created_at,
@@ -126,7 +128,7 @@ async function getPlaylistById({ playlistId, userId = null }) {
   );
 
   return {
-    ...publicPlaylistRow(playlist),
+    ...publicPlaylistRow(playlist, userId),
     tracks: tracksResult.rows.map(row => ({
       id: row.spotify_track_id,
       title: row.title,
@@ -171,9 +173,20 @@ async function togglePlaylistSave({ playlistId, userId }) {
   return true;
 }
 
-function publicPlaylistRow(row) {
+async function deletePlaylist({ playlistId, userId }) {
+  const result = await pool.query(
+    `DELETE FROM playlists
+     WHERE id = $1 AND user_id = $2
+     RETURNING id`,
+    [playlistId, userId]
+  );
+  return Boolean(result.rows[0]);
+}
+
+function publicPlaylistRow(row, currentUserId = null) {
   return {
     id: row.id,
+    ownerId: row.user_id,
     title: row.title,
     coverUrl: row.cover_url,
     createdAt: row.created_at,
@@ -183,6 +196,7 @@ function publicPlaylistRow(row) {
     saveCount: row.save_count || 0,
     liked: Boolean(row.liked),
     saved: Boolean(row.saved),
+    isOwner: currentUserId !== null && Number(row.user_id) === Number(currentUserId),
   };
 }
 
@@ -192,4 +206,5 @@ module.exports = {
   getPlaylistById,
   togglePlaylistLike,
   togglePlaylistSave,
+  deletePlaylist,
 };

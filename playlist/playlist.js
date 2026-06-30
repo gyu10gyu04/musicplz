@@ -12,10 +12,51 @@
   const detailTrackList = document.getElementById('detailTrackList');
   const likeBtn = document.getElementById('likeBtn');
   const saveBtn = document.getElementById('saveBtn');
+  const quickCardBackdrop = document.getElementById('quickCardBackdrop');
+  const quickCardClose = document.getElementById('quickCardClose');
+  const quickCover = document.getElementById('quickCover');
+  const quickTitle = document.getElementById('quickTitle');
+  const quickOwner = document.getElementById('quickOwner');
+  const quickStats = document.getElementById('quickStats');
+  const quickOwnerActions = document.getElementById('quickOwnerActions');
+  const quickEditBtn = document.getElementById('quickEditBtn');
+  const quickDeleteBtn = document.getElementById('quickDeleteBtn');
+  const waveEl = document.getElementById('waveTransition');
+  const wavePath = document.getElementById('wavePath');
+  const navCreate = document.querySelector('.nav-create');
 
   let sort = 'latest';
   let currentPlaylist = null;
+  let quickPlaylist = null;
   const savedOnly = new URLSearchParams(location.search).get('saved') === '1';
+
+  const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
+
+  function easeInOutCubic(t) {
+    return t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  }
+
+  function setWave(p) {
+    const e = easeInOutCubic(p);
+    const topY = 100 - e * 100;
+    const waveAmp = 9 * Math.sin(e * Math.PI);
+    const midY = topY - waveAmp;
+    wavePath.setAttribute('d', `M0,100 L0,${topY} C25,${midY} 75,${midY} 100,${topY} L100,100 Z`);
+  }
+
+  function playWaveTransition(toUrl) {
+    waveEl.style.pointerEvents = 'auto';
+    let start = null;
+    const DURATION = 620;
+    function step(ts) {
+      if (start === null) start = ts;
+      const p = clamp((ts - start) / DURATION, 0, 1);
+      setWave(p);
+      if (p < 1) requestAnimationFrame(step);
+      else location.href = toUrl;
+    }
+    requestAnimationFrame(step);
+  }
 
   async function loadList() {
     const params = new URLSearchParams({ sort });
@@ -51,8 +92,66 @@
         <div class="share-card-stats"><span>♥ ${playlist.likeCount || 0}</span><span>저장 ${playlist.saveCount || 0}</span></div>
       </div>
     `;
-    card.addEventListener('click', () => showDetail(playlist.id));
+    attachCardPress(card, playlist);
     return card;
+  }
+
+  function attachCardPress(card, playlist) {
+    let timer = null;
+    let startX = 0;
+    let startY = 0;
+    let longPressed = false;
+
+    function clear() {
+      window.clearTimeout(timer);
+      timer = null;
+      card.classList.remove('is-pressing');
+    }
+
+    card.addEventListener('pointerdown', e => {
+      if (e.button !== undefined && e.button !== 0) return;
+      longPressed = false;
+      startX = e.clientX;
+      startY = e.clientY;
+      card.classList.add('is-pressing');
+      timer = window.setTimeout(() => {
+        longPressed = true;
+        clear();
+        openQuickCard(playlist);
+      }, 520);
+    });
+
+    card.addEventListener('pointermove', e => {
+      if (!timer) return;
+      if (Math.abs(e.clientX - startX) > 10 || Math.abs(e.clientY - startY) > 10) clear();
+    });
+
+    card.addEventListener('pointerup', () => {
+      const wasLongPressed = longPressed;
+      clear();
+      if (!wasLongPressed) showDetail(playlist.id);
+    });
+
+    card.addEventListener('pointercancel', clear);
+    card.addEventListener('contextmenu', e => e.preventDefault());
+  }
+
+  function openQuickCard(playlist) {
+    quickPlaylist = playlist;
+    quickCover.src = playlist.coverUrl;
+    quickTitle.textContent = playlist.title;
+    quickOwner.textContent = `플리주인 @${playlist.displayName || 'MusicPlz'}`;
+    quickStats.textContent = `${playlist.trackCount || 0} tracks · ♥ ${playlist.likeCount || 0} · 저장 ${playlist.saveCount || 0}`;
+    quickOwnerActions.hidden = !playlist.isOwner;
+    quickCardBackdrop.hidden = false;
+    requestAnimationFrame(() => quickCardBackdrop.classList.add('is-open'));
+  }
+
+  function closeQuickCard() {
+    quickCardBackdrop.classList.remove('is-open');
+    setTimeout(() => {
+      if (!quickCardBackdrop.classList.contains('is-open')) quickCardBackdrop.hidden = true;
+    }, 180);
   }
 
   async function showDetail(id) {
@@ -102,6 +201,22 @@
     showDetail(currentPlaylist.id);
   }
 
+  async function deleteCurrentQuickPlaylist() {
+    if (!quickPlaylist || !quickPlaylist.isOwner) return;
+    if (!confirm(`"${quickPlaylist.title}" 플레이리스트를 삭제할까요?`)) return;
+
+    const res = await fetch(`/api/playlists/${quickPlaylist.id}`, {
+      method: 'DELETE',
+      credentials: 'same-origin',
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return alert(data.error || '삭제하지 못했어요.');
+
+    closeQuickCard();
+    if (currentPlaylist?.id === quickPlaylist.id) showList();
+    else loadList();
+  }
+
   function showList() {
     currentPlaylist = null;
     listToolbar.hidden = false;
@@ -130,6 +245,16 @@
   backToList.addEventListener('click', showList);
   likeBtn.addEventListener('click', () => toggleAction('like'));
   saveBtn.addEventListener('click', () => toggleAction('save'));
+  quickCardClose.addEventListener('click', closeQuickCard);
+  quickCardBackdrop.addEventListener('click', e => {
+    if (e.target === quickCardBackdrop) closeQuickCard();
+  });
+  quickEditBtn.addEventListener('click', () => alert('수정 기능은 다음 단계에서 연결할게요.'));
+  quickDeleteBtn.addEventListener('click', deleteCurrentQuickPlaylist);
+  navCreate.addEventListener('click', e => {
+    e.preventDefault();
+    playWaveTransition(navCreate.getAttribute('href'));
+  });
 
   const id = new URLSearchParams(location.search).get('id');
   if (id) showDetail(id);
