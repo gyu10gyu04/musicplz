@@ -507,11 +507,11 @@
       `;
       trayStrip.appendChild(chip);
     });
-    if (count > MAX_CHIPS) {
+    if (count > 0) {
       const more = document.createElement('div');
       more.className = 'tray-chip-more';
       more.style.cursor = 'pointer';
-      more.textContent = `+${count - MAX_CHIPS}`;
+      more.textContent = count > MAX_CHIPS ? `+${count - MAX_CHIPS}` : '...';
       more.addEventListener('click', () => {
         openSelectedTracksModal();
       });
@@ -529,9 +529,218 @@
 
   trayCreateBtn.addEventListener('click', () => {
     if (selectedOrder.length === 0) return;
-    // 실제 플레이리스트 생성 로직(서버 저장 등)이 들어갈 자리.
-    // 지금은 UI 동작 시연 단계라 담은 곡 목록만 안내.
-    alert(`"${selectedOrder.length}곡"으로 플레이리스트를 만들 준비가 됐어요!\n(플레이리스트 저장 기능은 다음 단계에서 연결할게요)`);
+    openPlaylistComposer();
+  });
+
+  /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     플레이리스트 만들기 모달
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+  const playlistComposerBackdrop = document.getElementById('playlistComposerBackdrop');
+  const playlistComposerClose = document.getElementById('playlistComposerClose');
+  const playlistCoverInput = document.getElementById('playlistCoverInput');
+  const playlistCoverPreview = document.getElementById('playlistCoverPreview');
+  const playlistCoverEmpty = document.getElementById('playlistCoverEmpty');
+  const playlistTitleInput = document.getElementById('playlistTitleInput');
+  const playlistTitleError = document.getElementById('playlistTitleError');
+  const playlistComposerList = document.getElementById('playlistComposerList');
+  const playlistSaveBtn = document.getElementById('playlistSaveBtn');
+
+  let playlistCoverObjectUrl = null;
+  let activeSortDrag = null;
+
+  function attachSortablePointerDrag(item, index, { listEl, itemSelector, renderList }) {
+    item.addEventListener('pointerdown', e => {
+      if (e.button !== undefined && e.button !== 0) return;
+      if (e.target.closest('button')) return;
+
+      window.clearTimeout(activeSortDrag?.timer);
+      item.classList.add('is-pressing');
+      activeSortDrag = {
+        item,
+        index,
+        targetIdx: index,
+        listEl,
+        itemSelector,
+        renderList,
+        pointerId: e.pointerId,
+        startX: e.clientX,
+        startY: e.clientY,
+        active: false,
+        timer: window.setTimeout(() => {
+          if (!activeSortDrag || activeSortDrag.item !== item) return;
+          activeSortDrag.active = true;
+          item.classList.remove('is-pressing');
+          item.classList.add('is-dragging');
+          listEl.classList.add('is-sorting');
+          item.setPointerCapture?.(e.pointerId);
+        }, 180),
+      };
+    });
+
+    item.addEventListener('pointermove', e => {
+      if (!activeSortDrag || activeSortDrag.item !== item) return;
+
+      const dx = e.clientX - activeSortDrag.startX;
+      const dy = e.clientY - activeSortDrag.startY;
+
+      if (!activeSortDrag.active) {
+        if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+          window.clearTimeout(activeSortDrag.timer);
+          item.classList.remove('is-pressing');
+          activeSortDrag = null;
+        }
+        return;
+      }
+
+      e.preventDefault();
+      item.style.transform = `translate3d(${dx}px, ${dy}px, 0) scale(1.02)`;
+
+      const children = [...listEl.querySelectorAll(itemSelector)];
+      const containerRect = listEl.getBoundingClientRect();
+      const relativeY = e.clientY - containerRect.top + listEl.scrollTop;
+
+      let nextTargetIdx = activeSortDrag.index;
+      let minDist = Infinity;
+      children.forEach((child, i) => {
+        const childMidY = child.offsetTop + child.offsetHeight / 2;
+        const dist = Math.abs(relativeY - childMidY);
+        if (dist < minDist) {
+          minDist = dist;
+          nextTargetIdx = i;
+        }
+      });
+
+      activeSortDrag.targetIdx = nextTargetIdx;
+      const shiftY = (children[0]?.offsetHeight || 70) + 12;
+
+      children.forEach((child, i) => {
+        if (child === item) return;
+        child.style.transform = '';
+
+        if (activeSortDrag.index < activeSortDrag.targetIdx && i > activeSortDrag.index && i <= activeSortDrag.targetIdx) {
+          child.style.transform = `translateY(-${shiftY}px)`;
+        } else if (activeSortDrag.index > activeSortDrag.targetIdx && i >= activeSortDrag.targetIdx && i < activeSortDrag.index) {
+          child.style.transform = `translateY(${shiftY}px)`;
+        }
+      });
+    });
+
+    function endSortDrag(e) {
+      if (!activeSortDrag || activeSortDrag.item !== item) return;
+      const drag = activeSortDrag;
+      item.releasePointerCapture?.(e.pointerId);
+      window.clearTimeout(drag.timer);
+      item.classList.remove('is-pressing', 'is-dragging');
+      drag.listEl.classList.remove('is-sorting');
+      [...drag.listEl.querySelectorAll(drag.itemSelector)].forEach(child => { child.style.transform = ''; });
+
+      if (drag.active && drag.targetIdx !== drag.index) {
+        const [removed] = selectedOrder.splice(drag.index, 1);
+        selectedOrder.splice(drag.targetIdx, 0, removed);
+        drag.renderList();
+        renderTray();
+        if (!selectedTracksModalBackdrop.hidden && drag.listEl !== selectedTracksModalList) renderSelectedTracksList();
+        if (!playlistComposerBackdrop.hidden && drag.listEl !== playlistComposerList) renderPlaylistComposerList();
+      }
+
+      activeSortDrag = null;
+    }
+
+    item.addEventListener('pointerup', endSortDrag);
+    item.addEventListener('pointercancel', endSortDrag);
+    item.addEventListener('contextmenu', e => e.preventDefault());
+  }
+
+  function openPlaylistComposer() {
+    playlistTitleError.textContent = '';
+    renderPlaylistComposerList();
+    playlistComposerBackdrop.hidden = false;
+    requestAnimationFrame(() => playlistComposerBackdrop.classList.add('is-open'));
+  }
+
+  function closePlaylistComposer() {
+    playlistComposerBackdrop.classList.remove('is-open');
+    setTimeout(() => {
+      if (!playlistComposerBackdrop.classList.contains('is-open')) {
+        playlistComposerBackdrop.hidden = true;
+      }
+    }, 220);
+  }
+
+  function renderPlaylistComposerList() {
+    playlistComposerList.innerHTML = '';
+
+    selectedOrder.forEach((id, i) => {
+      const track = trackById(id);
+      if (!track) return;
+
+      const item = document.createElement('div');
+      item.className = 'composer-track-item';
+      item.draggable = false;
+
+      const coverInner = track.coverUrl
+        ? `<img src="${track.coverUrl}" alt="" loading="lazy" draggable="false">`
+        : initials(track.artist);
+      const coverStyle = track.coverUrl ? '' : `style="background:${gradientFor(track.id)}"`;
+
+      item.innerHTML = `
+        <div class="composer-track-cover" ${coverStyle}>${coverInner}</div>
+        <div class="composer-track-info">
+          <div class="composer-track-title">${track.title}</div>
+          <div class="composer-track-artist">${track.artist}</div>
+        </div>
+        <button type="button" class="composer-track-remove" aria-label="삭제">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      `;
+
+      attachSortablePointerDrag(item, i, {
+        listEl: playlistComposerList,
+        itemSelector: '.composer-track-item',
+        renderList: renderPlaylistComposerList,
+      });
+
+      item.querySelector('.composer-track-remove').addEventListener('click', e => {
+        e.stopPropagation();
+        toggleTrack(track);
+        renderPlaylistComposerList();
+        if (selectedOrder.length === 0) closePlaylistComposer();
+      });
+
+      playlistComposerList.appendChild(item);
+    });
+  }
+
+  playlistCoverInput.addEventListener('change', () => {
+    const file = playlistCoverInput.files?.[0];
+    if (!file) return;
+    if (playlistCoverObjectUrl) URL.revokeObjectURL(playlistCoverObjectUrl);
+    playlistCoverObjectUrl = URL.createObjectURL(file);
+    playlistCoverPreview.src = playlistCoverObjectUrl;
+    playlistCoverPreview.hidden = false;
+    playlistCoverEmpty.hidden = true;
+  });
+
+  playlistSaveBtn.addEventListener('click', () => {
+    const title = playlistTitleInput.value.trim();
+    if (!title) {
+      playlistTitleError.textContent = '제목을 입력해주세요.';
+      playlistTitleInput.focus();
+      return;
+    }
+    playlistTitleError.textContent = '';
+    alert(`"${title}" 플레이리스트를 만들 준비가 됐어요.\n${selectedOrder.length}곡이 담겨 있습니다.`);
+  });
+
+  playlistComposerClose.addEventListener('click', closePlaylistComposer);
+  playlistComposerBackdrop.addEventListener('click', e => {
+    if (e.target === playlistComposerBackdrop) closePlaylistComposer();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !playlistComposerBackdrop.hidden) closePlaylistComposer();
   });
 
   /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -652,9 +861,6 @@
     selectedTracksModal.addEventListener('contextmenu', e => e.preventDefault());
   }
 
-  let draggedIdx = null;
-  let targetIdx = null;
-
   function renderSelectedTracksList() {
     selectedTracksModalList.innerHTML = '';
     if (selectedOrder.length === 0) {
@@ -668,7 +874,7 @@
 
       const item = document.createElement('div');
       item.className = 'selected-track-item';
-      item.draggable = true;
+      item.draggable = false;
       item.dataset.index = i;
 
       const coverInner = track.coverUrl
@@ -690,30 +896,10 @@
         </button>
       `;
 
-      // 드래그앤드롭 이벤트 리스너
-      item.addEventListener('dragstart', (e) => {
-        draggedIdx = i;
-        item.classList.add('is-dragging');
-        e.dataTransfer.effectAllowed = 'move';
-        selectedTracksModalList.classList.add('is-sorting');
-      });
-
-      item.addEventListener('dragend', () => {
-        item.classList.remove('is-dragging');
-        selectedTracksModalList.classList.remove('is-sorting');
-
-        // 모든 변형 속성 초기화
-        const children = [...selectedTracksModalList.children];
-        children.forEach(child => child.style.transform = '');
-
-        if (targetIdx !== null && targetIdx !== draggedIdx) {
-          const [removed] = selectedOrder.splice(draggedIdx, 1);
-          selectedOrder.splice(targetIdx, 0, removed);
-          renderSelectedTracksList();
-          renderTray();
-        }
-        draggedIdx = null;
-        targetIdx = null;
+      attachSortablePointerDrag(item, i, {
+        listEl: selectedTracksModalList,
+        itemSelector: '.selected-track-item',
+        renderList: renderSelectedTracksList,
       });
 
       item.querySelector('.selected-track-remove').addEventListener('click', (e) => {
@@ -723,47 +909,6 @@
       });
 
       selectedTracksModalList.appendChild(item);
-    });
-
-    // 벌어지는 애니메이션 처리를 위한 컨테이너 드래그오버 리스너 (레이아웃 고정형 offsetTop 기반)
-    selectedTracksModalList.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      if (draggedIdx === null) return;
-
-      const children = [...selectedTracksModalList.children];
-      const containerRect = selectedTracksModalList.getBoundingClientRect();
-      const relativeY = e.clientY - containerRect.top + selectedTracksModalList.scrollTop;
-
-      let tempTarget = draggedIdx;
-      let minDist = Infinity;
-
-      // offsetTop은 transform: translateY의 영향을 받지 않는 절대 위치이므로 계산에 완벽한 무결성을 지닙니다.
-      children.forEach((child, k) => {
-        const childMidY = child.offsetTop + child.offsetHeight / 2;
-        const d = Math.abs(relativeY - childMidY);
-        if (d < minDist) {
-          minDist = d;
-          tempTarget = k;
-        }
-      });
-
-      targetIdx = tempTarget;
-
-      // 드래그 위치에 맞추어 카드들이 벌어지는 느낌의 CSS Transform 동적 계산 적용
-      children.forEach((child, k) => {
-        if (k === draggedIdx) return;
-        child.style.transform = '';
-
-        if (draggedIdx < targetIdx) {
-          if (k > draggedIdx && k <= targetIdx) {
-            child.style.transform = 'translateY(-82px)'; // Item height 70px + gap 12px
-          }
-        } else if (draggedIdx > targetIdx) {
-          if (k >= targetIdx && k < draggedIdx) {
-            child.style.transform = 'translateY(82px)';
-          }
-        }
-      });
     });
   }
 

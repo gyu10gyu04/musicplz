@@ -156,6 +156,36 @@
     </div>
   </div>
 
+  <!-- ─── 플레이리스트 만들기 모달 ─── -->
+  <div class="playlist-composer-backdrop" id="playlistComposerBackdrop" hidden>
+    <div class="playlist-composer" role="dialog" aria-modal="true" aria-labelledby="playlistComposerTitle">
+      <button type="button" class="playlist-composer-close" id="playlistComposerClose" aria-label="닫기">
+        <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+
+      <div class="playlist-composer-header">
+        <label class="playlist-cover-picker" for="playlistCoverInput" id="playlistCoverPicker">
+          <input type="file" id="playlistCoverInput" accept="image/*" hidden>
+          <span class="playlist-cover-empty" id="playlistCoverEmpty">
+            <svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+          </span>
+          <img id="playlistCoverPreview" alt="" hidden>
+        </label>
+        <div class="playlist-title-field">
+          <label for="playlistTitleInput">플레이리스트 제목</label>
+          <input type="text" id="playlistTitleInput" maxlength="40" placeholder="제목 입력">
+          <span class="field-error" id="playlistTitleError"></span>
+        </div>
+      </div>
+
+      <div class="playlist-composer-list" id="playlistComposerList">
+        <!-- JS가 선택된 곡을 여기에 렌더링 -->
+      </div>
+
+      <button type="button" class="cta-btn purple playlist-save-btn" id="playlistSaveBtn">완료</button>
+    </div>
+  </div>
+
   <!-- 페이지 전환 웨이브 오버레이 (main.js / login.js와 동일 사양, 화면을 덮은 상태로 시작) -->
   <svg class="wave-transition" id="waveTransition" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
     <path id="wavePath" d="M0,100 L0,0 C25,0 75,0 100,0 L100,100 Z"></path>
