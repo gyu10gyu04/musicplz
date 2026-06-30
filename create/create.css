@@ -513,7 +513,9 @@ nav{
 
 .track-modal-title{
   font-size:1.18rem;font-weight:800;color:#0a0a0a;
-  line-height:1.35;margin-bottom:5px;
+  line-height:1.35;margin:0 auto 5px;
+  max-width:100%;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   transition:opacity .15s ease;
 }
 .track-modal-artist{
@@ -585,15 +587,19 @@ nav{
 /* ── 담은 곡 목록 모달 (트레이의 +버튼 클릭 시 표시) ── */
 .selected-tracks-modal-backdrop {
   position: fixed; inset: 0; z-index: 4500;
-  background: transparent;
-  backdrop-filter: none;
-  display: flex; align-items: flex-end; justify-content: flex-end;
-  padding: 20px 5% 112px;
+  background: rgba(10,8,20,0.5);
+  backdrop-filter: blur(8px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
   opacity: 0; pointer-events: none;
-  transition: opacity 0.25s ease;
+  transition: opacity 0.25s ease, background 0.18s ease, backdrop-filter 0.18s ease;
 }
 .selected-tracks-modal-backdrop.is-open {
-  opacity: 1; pointer-events: none;
+  opacity: 1; pointer-events: auto;
+}
+.selected-tracks-modal-backdrop.is-card-dragging {
+  background: transparent;
+  backdrop-filter: none;
 }
 .selected-tracks-modal-backdrop[hidden] {
   display: none;
@@ -605,16 +611,26 @@ nav{
   background: #ffffff; border-radius: 24px;
   padding: 28px 24px;
   box-shadow: 0 24px 68px rgba(0, 0, 0, 0.24);
-  transform: translateY(18px);
+  transform: translate(var(--modal-x, 0px), calc(var(--modal-y, 0px) + 12px)) scale(0.92);
   opacity: 0;
   transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease;
   display: flex; flex-direction: column;
-  max-height: min(58vh, 520px);
-  pointer-events: auto;
+  max-height: 80vh;
+  touch-action: pan-y;
+  -webkit-user-select: none;
+  user-select: none;
 }
 .selected-tracks-modal-backdrop.is-open .selected-tracks-modal {
-  transform: translateY(0);
+  transform: translate(var(--modal-x, 0px), var(--modal-y, 0px)) scale(1);
   opacity: 1;
+}
+.selected-tracks-modal.is-pressing-card {
+  transform: translate(var(--modal-x, 0px), var(--modal-y, 0px)) scale(0.985) !important;
+  box-shadow: 0 20px 58px rgba(124, 58, 237, 0.24), 0 8px 24px rgba(0,0,0,0.18);
+}
+.selected-tracks-modal.is-card-dragging {
+  cursor: grabbing;
+  transition: opacity 0.2s ease;
 }
 
 .selected-tracks-modal-close {
@@ -665,41 +681,15 @@ nav{
   background: #f8f6fc;
   border-radius: 16px;
   border: 1px solid #eee8f8;
-  cursor: grab;
+  cursor: default;
   transition: background 0.15s, transform 0.28s cubic-bezier(0.2, 1, 0.2, 1), box-shadow 0.2s ease, opacity 0.2s ease, filter 0.2s ease;
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
-  touch-action: pan-y;
   -webkit-tap-highlight-color: transparent;
 }
-.selected-track-item:active {
-  cursor: grabbing;
-}
-.selected-track-item.is-pressing {
-  transform: scale(0.975);
-  border-color: rgba(124,58,237,0.34);
-  box-shadow: 0 8px 22px rgba(124,58,237,0.14);
-}
 
-/* 드래그 중인 카드: 진하고 선명하게 + 그림자로 떠 있는 느낌 */
-.selected-track-item.is-dragging {
-  opacity: 1 !important;
-  background: #fff;
-  border: 1.5px solid #7c3aed;
-  box-shadow: 0 12px 36px rgba(124, 58, 237, 0.28), 0 4px 12px rgba(0,0,0,0.12);
-  filter: none !important;
-  z-index: 10;
-  cursor: grabbing;
-}
-
-/* 드래그 중에도 목록은 선명하게 유지 */
-.selected-tracks-modal-list.is-sorting .selected-track-item:not(.is-dragging) {
-  opacity: 1;
-  filter: none;
-}
-
-.selected-track-item:hover:not(.is-dragging) {
+.selected-track-item:hover {
   background: #f1ecf9;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(124, 58, 237, 0.08);
