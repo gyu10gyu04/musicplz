@@ -652,123 +652,8 @@
     selectedTracksModal.addEventListener('contextmenu', e => e.preventDefault());
   }
 
-  let selectedTrackDrag = null;
-
-  function selectedTrackItems() {
-    return [...selectedTracksModalList.querySelectorAll('.selected-track-item')];
-  }
-
-  function clearSelectedTrackTransforms() {
-    selectedTrackItems().forEach(item => { item.style.transform = ''; });
-  }
-
-  function updateSelectedTrackTarget(clientY) {
-    if (!selectedTrackDrag?.active) return;
-
-    const items = selectedTrackItems();
-    const containerRect = selectedTracksModalList.getBoundingClientRect();
-    const relativeY = clientY - containerRect.top + selectedTracksModalList.scrollTop;
-
-    let nextTargetIdx = selectedTrackDrag.index;
-    let minDist = Infinity;
-
-    items.forEach((item, i) => {
-      const itemMidY = item.offsetTop + item.offsetHeight / 2;
-      const dist = Math.abs(relativeY - itemMidY);
-      if (dist < minDist) {
-        minDist = dist;
-        nextTargetIdx = i;
-      }
-    });
-
-    selectedTrackDrag.targetIdx = nextTargetIdx;
-    const shiftY = (items[0]?.offsetHeight || 70) + 12;
-
-    items.forEach((item, i) => {
-      if (i === selectedTrackDrag.index) return;
-      item.style.transform = '';
-
-      if (selectedTrackDrag.index < selectedTrackDrag.targetIdx && i > selectedTrackDrag.index && i <= selectedTrackDrag.targetIdx) {
-        item.style.transform = `translateY(-${shiftY}px)`;
-      } else if (selectedTrackDrag.index > selectedTrackDrag.targetIdx && i >= selectedTrackDrag.targetIdx && i < selectedTrackDrag.index) {
-        item.style.transform = `translateY(${shiftY}px)`;
-      }
-    });
-  }
-
-  function clearSelectedTrackDrag() {
-    if (!selectedTrackDrag) return;
-    window.clearTimeout(selectedTrackDrag.timer);
-    selectedTrackDrag.item.classList.remove('is-pressing', 'is-dragging');
-    selectedTrackDrag = null;
-  }
-
-  function finishSelectedTrackDrag() {
-    if (selectedTrackDrag?.active && selectedTrackDrag.targetIdx !== selectedTrackDrag.index) {
-      const [removed] = selectedOrder.splice(selectedTrackDrag.index, 1);
-      selectedOrder.splice(selectedTrackDrag.targetIdx, 0, removed);
-      clearSelectedTrackDrag();
-      selectedTracksModalList.classList.remove('is-sorting');
-      renderSelectedTracksList();
-      renderTray();
-      return;
-    }
-
-    clearSelectedTrackTransforms();
-    clearSelectedTrackDrag();
-    selectedTracksModalList.classList.remove('is-sorting');
-  }
-
-  function attachSelectedTrackDrag(item, index) {
-    item.addEventListener('pointerdown', e => {
-      if (e.button !== undefined && e.button !== 0) return;
-      if (e.target.closest('.selected-track-remove')) return;
-
-      clearSelectedTrackDrag();
-      item.classList.add('is-pressing');
-      selectedTrackDrag = {
-        item,
-        pointerId: e.pointerId,
-        index,
-        targetIdx: index,
-        startX: e.clientX,
-        startY: e.clientY,
-        active: false,
-        timer: window.setTimeout(() => {
-          if (!selectedTrackDrag || selectedTrackDrag.item !== item) return;
-          selectedTrackDrag.active = true;
-          item.classList.remove('is-pressing');
-          item.classList.add('is-dragging');
-          selectedTracksModalList.classList.add('is-sorting');
-          item.setPointerCapture?.(e.pointerId);
-        }, 220),
-      };
-    });
-
-    item.addEventListener('pointermove', e => {
-      if (!selectedTrackDrag || selectedTrackDrag.item !== item) return;
-
-      const dx = Math.abs(e.clientX - selectedTrackDrag.startX);
-      const dy = Math.abs(e.clientY - selectedTrackDrag.startY);
-
-      if (!selectedTrackDrag.active) {
-        if (dx > 10 || dy > 10) clearSelectedTrackDrag();
-        return;
-      }
-
-      e.preventDefault();
-      updateSelectedTrackTarget(e.clientY);
-    });
-
-    item.addEventListener('pointerup', e => {
-      if (!selectedTrackDrag || selectedTrackDrag.item !== item) return;
-      item.releasePointerCapture?.(e.pointerId);
-      finishSelectedTrackDrag();
-    });
-
-    item.addEventListener('pointercancel', finishSelectedTrackDrag);
-    item.addEventListener('contextmenu', e => e.preventDefault());
-  }
+  let draggedIdx = null;
+  let targetIdx = null;
 
   function renderSelectedTracksList() {
     selectedTracksModalList.innerHTML = '';
@@ -783,7 +668,7 @@
 
       const item = document.createElement('div');
       item.className = 'selected-track-item';
-      item.draggable = false;
+      item.draggable = true;
       item.dataset.index = i;
 
       const coverInner = track.coverUrl
@@ -805,7 +690,31 @@
         </button>
       `;
 
-      attachSelectedTrackDrag(item, i);
+      // 드래그앤드롭 이벤트 리스너
+      item.addEventListener('dragstart', (e) => {
+        draggedIdx = i;
+        item.classList.add('is-dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        selectedTracksModalList.classList.add('is-sorting');
+      });
+
+      item.addEventListener('dragend', () => {
+        item.classList.remove('is-dragging');
+        selectedTracksModalList.classList.remove('is-sorting');
+
+        // 모든 변형 속성 초기화
+        const children = [...selectedTracksModalList.children];
+        children.forEach(child => child.style.transform = '');
+
+        if (targetIdx !== null && targetIdx !== draggedIdx) {
+          const [removed] = selectedOrder.splice(draggedIdx, 1);
+          selectedOrder.splice(targetIdx, 0, removed);
+          renderSelectedTracksList();
+          renderTray();
+        }
+        draggedIdx = null;
+        targetIdx = null;
+      });
 
       item.querySelector('.selected-track-remove').addEventListener('click', (e) => {
         e.stopPropagation();
@@ -814,6 +723,47 @@
       });
 
       selectedTracksModalList.appendChild(item);
+    });
+
+    // 벌어지는 애니메이션 처리를 위한 컨테이너 드래그오버 리스너 (레이아웃 고정형 offsetTop 기반)
+    selectedTracksModalList.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (draggedIdx === null) return;
+
+      const children = [...selectedTracksModalList.children];
+      const containerRect = selectedTracksModalList.getBoundingClientRect();
+      const relativeY = e.clientY - containerRect.top + selectedTracksModalList.scrollTop;
+
+      let tempTarget = draggedIdx;
+      let minDist = Infinity;
+
+      // offsetTop은 transform: translateY의 영향을 받지 않는 절대 위치이므로 계산에 완벽한 무결성을 지닙니다.
+      children.forEach((child, k) => {
+        const childMidY = child.offsetTop + child.offsetHeight / 2;
+        const d = Math.abs(relativeY - childMidY);
+        if (d < minDist) {
+          minDist = d;
+          tempTarget = k;
+        }
+      });
+
+      targetIdx = tempTarget;
+
+      // 드래그 위치에 맞추어 카드들이 벌어지는 느낌의 CSS Transform 동적 계산 적용
+      children.forEach((child, k) => {
+        if (k === draggedIdx) return;
+        child.style.transform = '';
+
+        if (draggedIdx < targetIdx) {
+          if (k > draggedIdx && k <= targetIdx) {
+            child.style.transform = 'translateY(-82px)'; // Item height 70px + gap 12px
+          }
+        } else if (draggedIdx > targetIdx) {
+          if (k >= targetIdx && k < draggedIdx) {
+            child.style.transform = 'translateY(82px)';
+          }
+        }
+      });
     });
   }
 

@@ -707,8 +707,9 @@ nav{
 }
 
 .selected-tracks-modal-list.is-sorting .selected-track-item:not(.is-dragging) {
-  opacity: 1;
-  filter: none;
+  opacity: 0.55;
+  filter: blur(0.6px) brightness(0.97);
+  background: rgba(248, 246, 252, 0.6);
 }
 
 .selected-track-item:hover:not(.is-dragging) {
