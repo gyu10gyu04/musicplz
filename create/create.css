@@ -681,15 +681,37 @@ nav{
   background: #f8f6fc;
   border-radius: 16px;
   border: 1px solid #eee8f8;
-  cursor: default;
+  cursor: grab;
   transition: background 0.15s, transform 0.28s cubic-bezier(0.2, 1, 0.2, 1), box-shadow 0.2s ease, opacity 0.2s ease, filter 0.2s ease;
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
+  touch-action: pan-y;
   -webkit-tap-highlight-color: transparent;
 }
 
-.selected-track-item:hover {
+.selected-track-item.is-pressing {
+  transform: scale(0.975);
+  border-color: rgba(124,58,237,0.34);
+  box-shadow: 0 8px 22px rgba(124,58,237,0.14);
+}
+
+.selected-track-item.is-dragging {
+  opacity: 1 !important;
+  background: #fff;
+  border: 1.5px solid #7c3aed;
+  box-shadow: 0 12px 36px rgba(124,58,237,0.28), 0 4px 12px rgba(0,0,0,0.12);
+  filter: none !important;
+  z-index: 10;
+  cursor: grabbing;
+}
+
+.selected-tracks-modal-list.is-sorting .selected-track-item:not(.is-dragging) {
+  opacity: 1;
+  filter: none;
+}
+
+.selected-track-item:hover:not(.is-dragging) {
   background: #f1ecf9;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(124, 58, 237, 0.08);

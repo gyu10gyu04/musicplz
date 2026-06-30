@@ -11,6 +11,7 @@
 const express = require('express');
 const { interpretSearchQuery, suggestArtistAlbumNames } = require('../services/gemini');
 const { searchTracks, getAlbumTracks, getArtistAlbums, searchAlbumsByArtistAndNames } = require('../services/spotify');
+const { correctTrackTitles } = require('../services/titleCorrection');
 
 const router = express.Router();
 
@@ -40,7 +41,7 @@ router.post('/search', async (req, res, next) => {
       };
     }
 
-    const tracks = await searchTracks(interpretation.searchQuery, 10);
+    const tracks = await correctTrackTitles(await searchTracks(interpretation.searchQuery, 10));
 
     console.log(`[검색 결과] "${interpretation.searchQuery}" → ${tracks.length}곡:`,
       tracks.map(t => `${t.title}(artistId=${t.artistId})`).join(' / '));
@@ -66,7 +67,9 @@ router.get('/album/:albumId', async (req, res, next) => {
     const { albumId } = req.params;
     const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
 
-    const { tracks, total, hasMore, album } = await getAlbumTracks(albumId, offset, 20);
+    const albumTracksResult = await getAlbumTracks(albumId, offset, 20);
+    const tracks = await correctTrackTitles(albumTracksResult.tracks);
+    const { total, hasMore, album } = albumTracksResult;
 
     // 대표곡 = popularity 가장 높은 트랙 (첫 페이지 응답 기준으로 사용 권장)
     const representativeTrack = tracks.reduce(

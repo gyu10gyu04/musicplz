@@ -601,6 +601,7 @@
     selectedTracksModal.addEventListener('pointerdown', e => {
       if (e.button !== undefined && e.button !== 0) return;
       if (e.target.closest('button')) return;
+      if (e.target.closest('.selected-track-item')) return;
 
       clearSelectedModalDrag();
       selectedTracksModal.classList.add('is-pressing-card');
@@ -644,12 +645,129 @@
       selectedTracksModal.releasePointerCapture?.(e.pointerId);
       clearSelectedModalDrag();
       selectedTracksModal.classList.remove('is-card-dragging');
-      selectedTracksModalBackdrop.classList.remove('is-card-dragging');
     }
 
     selectedTracksModal.addEventListener('pointerup', endDrag);
     selectedTracksModal.addEventListener('pointercancel', endDrag);
     selectedTracksModal.addEventListener('contextmenu', e => e.preventDefault());
+  }
+
+  let selectedTrackDrag = null;
+
+  function selectedTrackItems() {
+    return [...selectedTracksModalList.querySelectorAll('.selected-track-item')];
+  }
+
+  function clearSelectedTrackTransforms() {
+    selectedTrackItems().forEach(item => { item.style.transform = ''; });
+  }
+
+  function updateSelectedTrackTarget(clientY) {
+    if (!selectedTrackDrag?.active) return;
+
+    const items = selectedTrackItems();
+    const containerRect = selectedTracksModalList.getBoundingClientRect();
+    const relativeY = clientY - containerRect.top + selectedTracksModalList.scrollTop;
+
+    let nextTargetIdx = selectedTrackDrag.index;
+    let minDist = Infinity;
+
+    items.forEach((item, i) => {
+      const itemMidY = item.offsetTop + item.offsetHeight / 2;
+      const dist = Math.abs(relativeY - itemMidY);
+      if (dist < minDist) {
+        minDist = dist;
+        nextTargetIdx = i;
+      }
+    });
+
+    selectedTrackDrag.targetIdx = nextTargetIdx;
+    const shiftY = (items[0]?.offsetHeight || 70) + 12;
+
+    items.forEach((item, i) => {
+      if (i === selectedTrackDrag.index) return;
+      item.style.transform = '';
+
+      if (selectedTrackDrag.index < selectedTrackDrag.targetIdx && i > selectedTrackDrag.index && i <= selectedTrackDrag.targetIdx) {
+        item.style.transform = `translateY(-${shiftY}px)`;
+      } else if (selectedTrackDrag.index > selectedTrackDrag.targetIdx && i >= selectedTrackDrag.targetIdx && i < selectedTrackDrag.index) {
+        item.style.transform = `translateY(${shiftY}px)`;
+      }
+    });
+  }
+
+  function clearSelectedTrackDrag() {
+    if (!selectedTrackDrag) return;
+    window.clearTimeout(selectedTrackDrag.timer);
+    selectedTrackDrag.item.classList.remove('is-pressing', 'is-dragging');
+    selectedTrackDrag = null;
+  }
+
+  function finishSelectedTrackDrag() {
+    if (selectedTrackDrag?.active && selectedTrackDrag.targetIdx !== selectedTrackDrag.index) {
+      const [removed] = selectedOrder.splice(selectedTrackDrag.index, 1);
+      selectedOrder.splice(selectedTrackDrag.targetIdx, 0, removed);
+      clearSelectedTrackDrag();
+      selectedTracksModalList.classList.remove('is-sorting');
+      renderSelectedTracksList();
+      renderTray();
+      return;
+    }
+
+    clearSelectedTrackTransforms();
+    clearSelectedTrackDrag();
+    selectedTracksModalList.classList.remove('is-sorting');
+  }
+
+  function attachSelectedTrackDrag(item, index) {
+    item.addEventListener('pointerdown', e => {
+      if (e.button !== undefined && e.button !== 0) return;
+      if (e.target.closest('.selected-track-remove')) return;
+
+      clearSelectedTrackDrag();
+      item.classList.add('is-pressing');
+      selectedTrackDrag = {
+        item,
+        pointerId: e.pointerId,
+        index,
+        targetIdx: index,
+        startX: e.clientX,
+        startY: e.clientY,
+        active: false,
+        timer: window.setTimeout(() => {
+          if (!selectedTrackDrag || selectedTrackDrag.item !== item) return;
+          selectedTrackDrag.active = true;
+          item.classList.remove('is-pressing');
+          item.classList.add('is-dragging');
+          selectedTracksModalList.classList.add('is-sorting');
+          item.setPointerCapture?.(e.pointerId);
+        }, 220),
+      };
+    });
+
+    item.addEventListener('pointermove', e => {
+      if (!selectedTrackDrag || selectedTrackDrag.item !== item) return;
+
+      const dx = Math.abs(e.clientX - selectedTrackDrag.startX);
+      const dy = Math.abs(e.clientY - selectedTrackDrag.startY);
+
+      if (!selectedTrackDrag.active) {
+        if (dx > 10 || dy > 10) clearSelectedTrackDrag();
+        return;
+      }
+
+      e.preventDefault();
+      updateSelectedTrackTarget(e.clientY);
+    });
+
+    item.addEventListener('pointerup', e => {
+      if (!selectedTrackDrag || selectedTrackDrag.item !== item) return;
+      item.releasePointerCapture?.(e.pointerId);
+      finishSelectedTrackDrag();
+    });
+
+    item.addEventListener('pointercancel', finishSelectedTrackDrag);
+    item.addEventListener('contextmenu', e => e.preventDefault());
   }
 
   function renderSelectedTracksList() {
@@ -686,6 +804,8 @@
           </svg>
         </button>
       `;
+
+      attachSelectedTrackDrag(item, i);
 
       item.querySelector('.selected-track-remove').addEventListener('click', (e) => {
         e.stopPropagation();
