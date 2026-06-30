@@ -6,6 +6,11 @@ const {
   togglePlaylistLike,
   togglePlaylistSave,
   deletePlaylist,
+  listComments,
+  createComment,
+  updateComment,
+  deleteComment,
+  toggleCommentLike,
 } = require('../models/playlists');
 
 const router = express.Router();
@@ -112,6 +117,75 @@ router.delete('/:playlistId', requireLogin, async (req, res, next) => {
     if (!deleted) return res.status(403).json({ error: '이 플레이리스트를 삭제할 권한이 없습니다.' });
 
     res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/:playlistId/comments', async (req, res, next) => {
+  try {
+    const playlistId = Number(req.params.playlistId);
+    if (!Number.isInteger(playlistId)) return res.status(400).json({ error: '올바르지 않은 플레이리스트입니다.' });
+    const comments = await listComments({ playlistId, userId: req.session.userId || null });
+    res.json({ comments });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/:playlistId/comments', requireLogin, async (req, res, next) => {
+  try {
+    const playlistId = Number(req.params.playlistId);
+    if (!Number.isInteger(playlistId)) return res.status(400).json({ error: '올바르지 않은 플레이리스트입니다.' });
+
+    const content = String(req.body?.content || '').trim().slice(0, 500);
+    const parentCommentId = req.body?.parentCommentId ? Number(req.body.parentCommentId) : null;
+    if (!content) return res.status(400).json({ error: '댓글 내용을 입력해주세요.' });
+    if (parentCommentId !== null && !Number.isInteger(parentCommentId)) return res.status(400).json({ error: '올바르지 않은 답글입니다.' });
+
+    await createComment({ playlistId, userId: req.session.userId, parentCommentId, content });
+    const comments = await listComments({ playlistId, userId: req.session.userId });
+    res.status(201).json({ comments });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.patch('/comments/:commentId', requireLogin, async (req, res, next) => {
+  try {
+    const commentId = Number(req.params.commentId);
+    if (!Number.isInteger(commentId)) return res.status(400).json({ error: '올바르지 않은 댓글입니다.' });
+
+    const content = String(req.body?.content || '').trim().slice(0, 500);
+    if (!content) return res.status(400).json({ error: '댓글 내용을 입력해주세요.' });
+
+    const updated = await updateComment({ commentId, userId: req.session.userId, content });
+    if (!updated) return res.status(403).json({ error: '댓글을 수정할 권한이 없습니다.' });
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.delete('/comments/:commentId', requireLogin, async (req, res, next) => {
+  try {
+    const commentId = Number(req.params.commentId);
+    if (!Number.isInteger(commentId)) return res.status(400).json({ error: '올바르지 않은 댓글입니다.' });
+
+    const deleted = await deleteComment({ commentId, userId: req.session.userId });
+    if (!deleted) return res.status(403).json({ error: '댓글을 삭제할 권한이 없습니다.' });
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/comments/:commentId/like', requireLogin, async (req, res, next) => {
+  try {
+    const commentId = Number(req.params.commentId);
+    if (!Number.isInteger(commentId)) return res.status(400).json({ error: '올바르지 않은 댓글입니다.' });
+    const liked = await toggleCommentLike({ commentId, userId: req.session.userId });
+    res.json({ liked });
   } catch (err) {
     next(err);
   }

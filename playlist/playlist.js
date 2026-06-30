@@ -21,6 +21,10 @@
   const quickOwnerActions = document.getElementById('quickOwnerActions');
   const quickEditBtn = document.getElementById('quickEditBtn');
   const quickDeleteBtn = document.getElementById('quickDeleteBtn');
+  const quickComments = document.getElementById('quickComments');
+  const quickCommentInput = document.getElementById('quickCommentInput');
+  const quickCommentSend = document.getElementById('quickCommentSend');
+  const quickReplyState = document.getElementById('quickReplyState');
   const waveEl = document.getElementById('waveTransition');
   const wavePath = document.getElementById('wavePath');
   const navCreate = document.querySelector('.nav-create');
@@ -28,6 +32,7 @@
   let sort = 'latest';
   let currentPlaylist = null;
   let quickPlaylist = null;
+  let replyToCommentId = null;
   const savedOnly = new URLSearchParams(location.search).get('saved') === '1';
 
   const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
@@ -138,12 +143,16 @@
 
   function openQuickCard(playlist) {
     quickPlaylist = playlist;
+    replyToCommentId = null;
     quickCover.src = playlist.coverUrl;
     quickTitle.textContent = playlist.title;
     quickOwner.textContent = `플리주인 @${playlist.displayName || 'MusicPlz'}`;
     quickStats.textContent = `${playlist.trackCount || 0} tracks · ♥ ${playlist.likeCount || 0} · 저장 ${playlist.saveCount || 0}`;
     quickOwnerActions.hidden = !playlist.isOwner;
+    quickCommentInput.value = '';
+    quickReplyState.hidden = true;
     quickCardBackdrop.hidden = false;
+    loadQuickComments();
     requestAnimationFrame(() => quickCardBackdrop.classList.add('is-open'));
   }
 
@@ -203,7 +212,7 @@
 
   async function deleteCurrentQuickPlaylist() {
     if (!quickPlaylist || !quickPlaylist.isOwner) return;
-    if (!confirm(`"${quickPlaylist.title}" 플레이리스트를 삭제할까요?`)) return;
+    if (!confirm(`"${quickPlaylist.title}" 플레이리스트를 삭제할까요?\n\n이 플레이리스트를 저장한 모든 사용자의 보관함에서도 지워집니다.`)) return;
 
     const res = await fetch(`/api/playlists/${quickPlaylist.id}`, {
       method: 'DELETE',
@@ -215,6 +224,112 @@
     closeQuickCard();
     if (currentPlaylist?.id === quickPlaylist.id) showList();
     else loadList();
+  }
+
+  async function loadQuickComments() {
+    if (!quickPlaylist) return;
+    quickComments.innerHTML = '<div class="quick-comment-empty">댓글을 불러오는 중...</div>';
+
+    const res = await fetch(`/api/playlists/${quickPlaylist.id}/comments`, { credentials: 'same-origin' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      quickComments.innerHTML = `<div class="quick-comment-empty">${escapeHtml(data.error || '댓글을 불러오지 못했어요.')}</div>`;
+      return;
+    }
+
+    renderQuickComments(Array.isArray(data.comments) ? data.comments : []);
+  }
+
+  function renderQuickComments(comments) {
+    quickComments.innerHTML = '';
+    if (comments.length === 0) {
+      quickComments.innerHTML = '<div class="quick-comment-empty">아직 댓글이 없습니다.</div>';
+      return;
+    }
+
+    comments.forEach(comment => {
+      const item = document.createElement('div');
+      item.className = `quick-comment${comment.parentCommentId ? ' is-reply' : ''}`;
+      item.innerHTML = `
+        <div class="quick-comment-top">
+          <strong>@${escapeHtml(comment.displayName || 'MusicPlz')}</strong>
+          <span>${formatTime(comment.createdAt)}${comment.updatedAt ? ' · 수정됨' : ''}</span>
+        </div>
+        <div class="quick-comment-body">${escapeHtml(comment.content)}</div>
+        <div class="quick-comment-actions">
+          <button type="button" data-action="reply">답장</button>
+          <button type="button" data-action="like">공감 ${comment.likeCount || 0}</button>
+          ${comment.isOwner ? '<button type="button" data-action="edit">수정</button><button type="button" data-action="delete">삭제</button>' : ''}
+        </div>
+      `;
+
+      item.querySelector('[data-action="reply"]').addEventListener('click', () => {
+        replyToCommentId = comment.id;
+        quickReplyState.hidden = false;
+        quickReplyState.textContent = `@${comment.displayName || 'MusicPlz'}에게 답장 중`;
+        quickCommentInput.focus();
+      });
+
+      item.querySelector('[data-action="like"]').addEventListener('click', async () => {
+        const res = await fetch(`/api/playlists/comments/${comment.id}/like`, { method: 'POST', credentials: 'same-origin' });
+        if (!res.ok) return alert('로그인이 필요합니다.');
+        loadQuickComments();
+      });
+
+      const editBtn = item.querySelector('[data-action="edit"]');
+      if (editBtn) {
+        editBtn.addEventListener('click', async () => {
+          const content = prompt('댓글 수정', comment.content);
+          if (!content || !content.trim()) return;
+          const res = await fetch(`/api/playlists/comments/${comment.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ content: content.trim() }),
+          });
+          if (!res.ok) return alert('수정하지 못했어요.');
+          loadQuickComments();
+        });
+      }
+
+      const deleteBtn = item.querySelector('[data-action="delete"]');
+      if (deleteBtn) {
+        deleteBtn.addEventListener('click', async () => {
+          if (!confirm('댓글을 삭제할까요?')) return;
+          const res = await fetch(`/api/playlists/comments/${comment.id}`, { method: 'DELETE', credentials: 'same-origin' });
+          if (!res.ok) return alert('삭제하지 못했어요.');
+          loadQuickComments();
+        });
+      }
+
+      quickComments.appendChild(item);
+    });
+  }
+
+  async function submitQuickComment() {
+    if (!quickPlaylist) return;
+    const content = quickCommentInput.value.trim();
+    if (!content) return;
+
+    const res = await fetch(`/api/playlists/${quickPlaylist.id}/comments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ content, parentCommentId: replyToCommentId }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return alert(data.error || '댓글을 등록하지 못했어요.');
+
+    quickCommentInput.value = '';
+    replyToCommentId = null;
+    quickReplyState.hidden = true;
+    renderQuickComments(Array.isArray(data.comments) ? data.comments : []);
+  }
+
+  function formatTime(value) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   }
 
   function showList() {
@@ -251,6 +366,14 @@
   });
   quickEditBtn.addEventListener('click', () => alert('수정 기능은 다음 단계에서 연결할게요.'));
   quickDeleteBtn.addEventListener('click', deleteCurrentQuickPlaylist);
+  quickCommentSend.addEventListener('click', submitQuickComment);
+  quickCommentInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') submitQuickComment();
+    if (e.key === 'Escape') {
+      replyToCommentId = null;
+      quickReplyState.hidden = true;
+    }
+  });
   navCreate.addEventListener('click', e => {
     e.preventDefault();
     playWaveTransition(navCreate.getAttribute('href'));

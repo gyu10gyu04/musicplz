@@ -58,15 +58,26 @@
   <div class="quick-card-backdrop" id="quickCardBackdrop" hidden>
     <div class="quick-card" id="quickCard">
       <button type="button" class="quick-card-close" id="quickCardClose" aria-label="닫기">×</button>
-      <img id="quickCover" alt="" class="quick-cover">
-      <div class="quick-meta">
-        <p class="tagline">Playlist Info</p>
-        <h2 id="quickTitle"></h2>
-        <p id="quickOwner"></p>
-        <div class="quick-stats" id="quickStats"></div>
-        <div class="quick-owner-actions" id="quickOwnerActions" hidden>
-          <button type="button" id="quickEditBtn">수정</button>
-          <button type="button" id="quickDeleteBtn" class="danger">삭제</button>
+      <div class="quick-info-pane">
+        <img id="quickCover" alt="" class="quick-cover">
+        <div class="quick-meta">
+          <p class="tagline">Playlist Info</p>
+          <h2 id="quickTitle"></h2>
+          <p id="quickOwner"></p>
+          <div class="quick-stats" id="quickStats"></div>
+          <div class="quick-owner-actions" id="quickOwnerActions" hidden>
+            <button type="button" id="quickEditBtn">수정</button>
+            <button type="button" id="quickDeleteBtn" class="danger">삭제</button>
+          </div>
+        </div>
+      </div>
+      <div class="quick-chat-pane">
+        <div class="quick-chat-head">채팅</div>
+        <div class="quick-comments" id="quickComments"></div>
+        <div class="quick-reply-state" id="quickReplyState" hidden></div>
+        <div class="quick-comment-form">
+          <input type="text" id="quickCommentInput" maxlength="500" placeholder="댓글 달기">
+          <button type="button" id="quickCommentSend">등록</button>
         </div>
       </div>
     </div>

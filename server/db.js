@@ -85,8 +85,28 @@ async function initSchema() {
       PRIMARY KEY (user_id, playlist_id)
     );
   `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS playlist_comments (
+      id                SERIAL PRIMARY KEY,
+      playlist_id       INTEGER NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,
+      user_id           INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      parent_comment_id INTEGER REFERENCES playlist_comments(id) ON DELETE CASCADE,
+      content           TEXT NOT NULL,
+      created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at        TIMESTAMPTZ
+    );
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS playlist_comment_likes (
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      comment_id INTEGER NOT NULL REFERENCES playlist_comments(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (user_id, comment_id)
+    );
+  `);
   await pool.query(`CREATE INDEX IF NOT EXISTS playlists_created_at_idx ON playlists (created_at DESC);`);
   await pool.query(`CREATE INDEX IF NOT EXISTS playlist_tracks_playlist_id_idx ON playlist_tracks (playlist_id, position);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS playlist_comments_playlist_id_idx ON playlist_comments (playlist_id, created_at);`);
   // express-session용 세션 테이블(session)은 connect-pg-simple이 자동으로 생성합니다.
 }
 

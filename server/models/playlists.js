@@ -183,6 +183,78 @@ async function deletePlaylist({ playlistId, userId }) {
   return Boolean(result.rows[0]);
 }
 
+async function listComments({ playlistId, userId = null }) {
+  const { rows } = await pool.query(
+    `SELECT
+       c.id,
+       c.playlist_id,
+       c.user_id,
+       c.parent_comment_id,
+       c.content,
+       c.created_at,
+       c.updated_at,
+       u.display_name,
+       COUNT(DISTINCT cl.user_id)::int AS like_count,
+       BOOL_OR(cl.user_id = $2) AS liked
+     FROM playlist_comments c
+     JOIN users u ON u.id = c.user_id
+     LEFT JOIN playlist_comment_likes cl ON cl.comment_id = c.id
+     WHERE c.playlist_id = $1
+     GROUP BY c.id, u.display_name
+     ORDER BY COALESCE(c.parent_comment_id, c.id), c.parent_comment_id NULLS FIRST, c.created_at ASC`,
+    [playlistId, userId]
+  );
+
+  return rows.map(row => publicCommentRow(row, userId));
+}
+
+async function createComment({ playlistId, userId, parentCommentId = null, content }) {
+  const { rows } = await pool.query(
+    `INSERT INTO playlist_comments (playlist_id, user_id, parent_comment_id, content)
+     VALUES ($1, $2, $3, $4)
+     RETURNING id, playlist_id, user_id, parent_comment_id, content, created_at, updated_at`,
+    [playlistId, userId, parentCommentId, content]
+  );
+  return rows[0];
+}
+
+async function updateComment({ commentId, userId, content }) {
+  const { rows } = await pool.query(
+    `UPDATE playlist_comments
+     SET content = $3, updated_at = now()
+     WHERE id = $1 AND user_id = $2
+     RETURNING id`,
+    [commentId, userId, content]
+  );
+  return Boolean(rows[0]);
+}
+
+async function deleteComment({ commentId, userId }) {
+  const { rows } = await pool.query(
+    `DELETE FROM playlist_comments
+     WHERE id = $1 AND user_id = $2
+     RETURNING id`,
+    [commentId, userId]
+  );
+  return Boolean(rows[0]);
+}
+
+async function toggleCommentLike({ commentId, userId }) {
+  const existing = await pool.query(
+    `SELECT 1 FROM playlist_comment_likes WHERE comment_id = $1 AND user_id = $2`,
+    [commentId, userId]
+  );
+  if (existing.rows.length) {
+    await pool.query(`DELETE FROM playlist_comment_likes WHERE comment_id = $1 AND user_id = $2`, [commentId, userId]);
+    return false;
+  }
+  await pool.query(
+    `INSERT INTO playlist_comment_likes (comment_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+    [commentId, userId]
+  );
+  return true;
+}
+
 function publicPlaylistRow(row, currentUserId = null) {
   return {
     id: row.id,
@@ -200,6 +272,22 @@ function publicPlaylistRow(row, currentUserId = null) {
   };
 }
 
+function publicCommentRow(row, currentUserId = null) {
+  return {
+    id: row.id,
+    playlistId: row.playlist_id,
+    userId: row.user_id,
+    parentCommentId: row.parent_comment_id,
+    content: row.content,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    displayName: row.display_name,
+    likeCount: row.like_count || 0,
+    liked: Boolean(row.liked),
+    isOwner: currentUserId !== null && Number(row.user_id) === Number(currentUserId),
+  };
+}
+
 module.exports = {
   createPlaylist,
   listPlaylists,
@@ -207,4 +295,9 @@ module.exports = {
   togglePlaylistLike,
   togglePlaylistSave,
   deletePlaylist,
+  listComments,
+  createComment,
+  updateComment,
+  deleteComment,
+  toggleCommentLike,
 };
