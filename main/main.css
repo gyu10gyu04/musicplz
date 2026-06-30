@@ -372,6 +372,9 @@ h1{
   font-size:2.8rem;
   position:relative;overflow:hidden;
 }
+.card-cover img{
+  width:100%;height:100%;object-fit:cover;display:block;
+}
 .cover-1{background:#f3f0ff;}
 .cover-2{background:#f0fdf4;}
 .cover-3{background:#fff1f4;}

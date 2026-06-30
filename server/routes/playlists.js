@@ -20,7 +20,11 @@ router.get('/', async (req, res, next) => {
   try {
     const query = String(req.query.q || '').trim().slice(0, 80);
     const sort = req.query.sort === 'popular' ? 'popular' : 'latest';
-    const playlists = await listPlaylists({ query, sort, userId: req.session.userId || null });
+    const savedOnly = req.query.saved === '1';
+    if (savedOnly && !req.session.userId) {
+      return res.status(401).json({ error: '로그인이 필요합니다.' });
+    }
+    const playlists = await listPlaylists({ query, sort, userId: req.session.userId || null, savedOnly });
     res.json({ playlists });
   } catch (err) {
     next(err);

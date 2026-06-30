@@ -17,6 +17,7 @@
   const cardContainer = document.getElementById('cardContainer');
   const cardEls   = cardContainer ? [...cardContainer.querySelectorAll('.playlist-card')] : [];
   const featureItems = [...document.querySelectorAll('#featureGrid .feature-item')];
+  const trendingCard = document.querySelector('.trending-card');
 
   /* ─── 스크롤 상태 ─── */
   let sW       = window.innerWidth;
@@ -40,6 +41,25 @@
   function easeOutBack(t) {
     const c1=1.70158, c3=c1+1;
     return 1 + c3*Math.pow(t-1,3) + c1*Math.pow(t-1,2);
+  }
+
+  function escapeHtml(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function formatCompactNumber(value) {
+    const n = Number(value) || 0;
+    if (n >= 1000) return `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k`;
+    return String(n);
+  }
+
+  function playlistUrl(id) {
+    return `../playlist/playlist.html?id=${encodeURIComponent(id)}`;
   }
 
   /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -132,6 +152,62 @@
       }, { passive: true });
       card.addEventListener('mouseleave', () => { hovered = { el: null, tx:0, ty:0 }; }, { passive: true });
     });
+  }
+
+  async function loadFeaturedPlaylists() {
+    try {
+      const res = await fetch('/api/playlists?sort=popular', { credentials: 'same-origin' });
+      const data = await res.json().catch(() => ({}));
+      const playlists = Array.isArray(data.playlists) ? data.playlists.slice(0, 3) : [];
+      if (playlists.length === 0) return;
+
+      playlists.forEach((playlist, i) => {
+        const card = cardEls[i];
+        if (!card) return;
+        const cover = card.querySelector('.card-cover');
+        const badge = card.querySelector('.card-badge');
+        const title = card.querySelector('.card-title');
+        const user = card.querySelector('.card-user');
+        const likes = card.querySelector('.card-likes');
+
+        if (cover) {
+          cover.classList.remove('cover-1', 'cover-2', 'cover-3');
+          cover.innerHTML = playlist.coverUrl
+            ? `<img src="${playlist.coverUrl}" alt="" loading="lazy" draggable="false">`
+            : '🎧';
+        }
+        if (badge) badge.textContent = `${playlist.trackCount || 0} TRACKS`;
+        if (title) title.textContent = playlist.title;
+        if (user) user.textContent = `by @${playlist.displayName || 'MusicPlz'}`;
+        if (likes) likes.innerHTML = `<span class="heart">♥</span> ${formatCompactNumber(playlist.likeCount)}`;
+        card.addEventListener('click', () => { location.href = playlistUrl(playlist.id); });
+      });
+
+      if (trendingCard) {
+        const titleEl = trendingCard.querySelector('.trending-card-title');
+        trendingCard.innerHTML = '';
+        if (titleEl) trendingCard.appendChild(titleEl);
+        playlists.forEach((playlist, i) => {
+          const item = document.createElement('div');
+          item.className = 't-item';
+          item.innerHTML = `
+            <span class="t-rank">${String(i + 1).padStart(2, '0')}</span>
+            <div class="t-info">
+              <div class="t-name">${escapeHtml(playlist.title)}</div>
+              <div class="t-curator">@${escapeHtml(playlist.displayName || 'MusicPlz')}</div>
+            </div>
+            <span class="t-likes">${formatCompactNumber(playlist.likeCount)}♥</span>
+          `;
+          item.addEventListener('click', () => { location.href = playlistUrl(playlist.id); });
+          trendingCard.appendChild(item);
+        });
+      }
+
+      cardOffsets = null;
+      measureCards();
+    } catch (err) {
+      console.warn('[인기 플레이리스트 로드 실패]', err);
+    }
   }
 
   /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

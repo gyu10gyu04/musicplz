@@ -42,16 +42,25 @@ async function createPlaylist({ userId, title, coverUrl, tracks }) {
   }
 }
 
-async function listPlaylists({ query = '', sort = 'latest', userId = null }) {
+async function listPlaylists({ query = '', sort = 'latest', userId = null, savedOnly = false }) {
   const values = [];
-  let where = '';
+  const whereParts = [];
   if (query) {
     values.push(`%${query}%`);
-    where = `WHERE p.title ILIKE $${values.length}`;
+    whereParts.push(`p.title ILIKE $${values.length}`);
+  }
+
+  if (savedOnly) {
+    values.push(userId);
+    whereParts.push(`EXISTS (
+      SELECT 1 FROM playlist_saves saved_filter
+      WHERE saved_filter.playlist_id = p.id AND saved_filter.user_id = $${values.length}
+    )`);
   }
 
   values.push(userId);
   const userParam = `$${values.length}`;
+  const where = whereParts.length ? `WHERE ${whereParts.join(' AND ')}` : '';
 
   const orderBy = sort === 'popular'
     ? 'like_count DESC, p.created_at DESC'
