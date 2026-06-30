@@ -46,6 +46,12 @@
           <span class="field-error" id="passwordError"></span>
         </div>
 
+        <div class="field" id="passwordConfirmField" hidden>
+          <label for="passwordConfirm">비밀번호 확인</label>
+          <input type="password" id="passwordConfirm" name="passwordConfirm" placeholder="비밀번호 다시 입력" autocomplete="new-password" minlength="8">
+          <span class="field-error" id="passwordConfirmError"></span>
+        </div>
+
         <div class="row-between" id="loginOnlyRow">
           <label class="remember">
             <input type="checkbox" id="remember">

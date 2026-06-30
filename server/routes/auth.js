@@ -105,7 +105,9 @@ function baseUrl(req) {
 
 async function sendEmailVerification(req, user) {
   if (!isEmailEnabled()) {
-    throw new Error('RESEND_API_KEY 또는 EMAIL_FROM 환경 변수가 설정되어 있지 않습니다.');
+    const err = new Error('이메일 인증 발송 설정이 아직 완료되지 않았습니다. 관리자에게 문의해주세요.');
+    err.status = 503;
+    throw err;
   }
 
   const token = crypto.randomBytes(32).toString('hex');
@@ -121,6 +123,24 @@ async function sendEmailVerification(req, user) {
     to: user.email,
     displayName: user.display_name,
     verifyUrl,
+  });
+}
+
+async function sendEmailVerificationOrRespond(req, res, user, message, status = 201) {
+  if (!isEmailEnabled()) {
+    return res.status(503).json({ error: '이메일 인증 발송 설정이 아직 완료되지 않았습니다. 관리자에게 문의해주세요.' });
+  }
+
+  try {
+    await sendEmailVerification(req, user);
+  } catch (err) {
+    console.error('[이메일 인증 발송 실패]', err.message);
+    return res.status(err.status || 502).json({ error: '인증 메일을 보내지 못했어요. 잠시 후 다시 시도해주세요.' });
+  }
+
+  return res.status(status).json({
+    emailVerificationRequired: true,
+    message,
   });
 }
 
@@ -197,11 +217,7 @@ router.post('/signup', authRateLimit({ windowMs: 15 * 60 * 1000, max: 10, keyPre
     const existing = await findByEmail(normalizedEmail);
     if (existing) {
       if (!existing.email_verified) {
-        await sendEmailVerification(req, existing);
-        return res.status(202).json({
-          emailVerificationRequired: true,
-          message: '이미 가입 대기 중인 이메일이에요. 인증 메일을 다시 보냈어요.',
-        });
+        return sendEmailVerificationOrRespond(req, res, existing, '이미 가입 대기 중인 이메일이에요. 인증 메일을 다시 보냈어요.', 202);
       }
       return res.status(409).json({ error: '이미 가입된 이메일이에요.' });
     }
@@ -230,11 +246,7 @@ router.post('/signup', authRateLimit({ windowMs: 15 * 60 * 1000, max: 10, keyPre
       throw dbErr;
     }
 
-    await sendEmailVerification(req, user);
-    res.status(201).json({
-      emailVerificationRequired: true,
-      message: '인증 메일을 보냈어요. 메일함에서 인증을 완료한 뒤 로그인해주세요.',
-    });
+    return sendEmailVerificationOrRespond(req, res, user, '인증 메일을 보냈어요. 메일함에서 인증을 완료한 뒤 로그인해주세요.', 201);
   } catch (err) {
     next(err);
   }

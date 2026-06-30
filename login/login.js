@@ -97,6 +97,7 @@
   const modeDescription  = document.getElementById('modeDescription');
   const nameField        = document.getElementById('nameField');
   const loginOnlyRow     = document.getElementById('loginOnlyRow');
+  const passwordConfirmField = document.getElementById('passwordConfirmField');
   const submitLabel      = document.getElementById('submitLabel');
   const modeSwitchPrompt = document.getElementById('modeSwitchPrompt');
   const displayNameInput = document.getElementById('displayName');
@@ -108,6 +109,7 @@
       modeHeading.innerHTML = '다시 만나서<br><span class="gradient-text">반가워요.</span>';
       modeDescription.textContent = '계정에 로그인하고 나만의 플레이리스트를 이어가세요.';
       nameField.hidden = true;
+      passwordConfirmField.hidden = true;
       loginOnlyRow.hidden = false;
       submitLabel.textContent = '로그인';
       modeSwitchPrompt.innerHTML = '아직 계정이 없으신가요? <a href="#" id="modeSwitchLink">무료로 시작하기</a>';
@@ -116,6 +118,7 @@
       modeHeading.innerHTML = '취향을 발견할<br><span class="gradient-text">시간이에요.</span>';
       modeDescription.textContent = '이메일만으로 30초 안에 가입하고 바로 시작해보세요.';
       nameField.hidden = false;
+      passwordConfirmField.hidden = false;
       loginOnlyRow.hidden = true;
       submitLabel.textContent = '무료로 시작하기';
       modeSwitchPrompt.innerHTML = '이미 계정이 있으신가요? <a href="#" id="modeSwitchLink">로그인하기</a>';
@@ -156,6 +159,8 @@
   const emailInput    = document.getElementById('email');
   const emailError    = document.getElementById('emailError');
   const passwordError = document.getElementById('passwordError');
+  const passwordConfirmInput = document.getElementById('passwordConfirm');
+  const passwordConfirmError = document.getElementById('passwordConfirmError');
   const submitBtn     = document.getElementById('submitBtn');
   const serverError   = document.getElementById('serverError');
   const captchaField  = document.getElementById('captchaField');
@@ -316,6 +321,18 @@
       setFieldError(pwInput, passwordError, '');
     }
 
+    if (mode === 'signup') {
+      if (!passwordConfirmInput.value) {
+        setFieldError(passwordConfirmInput, passwordConfirmError, '비밀번호 확인을 입력해주세요.');
+        ok = false;
+      } else if (passwordConfirmInput.value !== pwInput.value) {
+        setFieldError(passwordConfirmInput, passwordConfirmError, '비밀번호가 일치하지 않아요.');
+        ok = false;
+      } else {
+        setFieldError(passwordConfirmInput, passwordConfirmError, '');
+      }
+    }
+
     if (turnstileEnabled && !turnstileToken) {
       setCaptchaError('보안 확인을 완료해주세요.');
       ok = false;
@@ -324,9 +341,15 @@
     return ok;
   }
 
-  [displayNameInput, emailInput, pwInput].forEach(input => {
+  [displayNameInput, emailInput, pwInput, passwordConfirmInput].forEach(input => {
     input.addEventListener('input', () => {
-      const errEl = input === displayNameInput ? displayNameError : input === emailInput ? emailError : passwordError;
+      const errEl = input === displayNameInput
+        ? displayNameError
+        : input === emailInput
+          ? emailError
+          : input === passwordConfirmInput
+            ? passwordConfirmError
+            : passwordError;
       setFieldError(input, errEl, '');
       clearServerError();
     });
