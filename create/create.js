@@ -97,6 +97,16 @@
     return s.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
   }
 
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }[ch]));
+  }
+
   function gradientFor(seed) {
     // 곡 id 문자열을 간단히 해시해서 항상 같은 그라디언트가 나오도록 함
     let hash = 0;
@@ -151,15 +161,15 @@
 
     // Spotify가 앨범 커버 이미지를 줬으면 그걸 쓰고, 없으면 이니셜+그라디언트로 대체
     const coverInner = track.coverUrl
-      ? `<img src="${track.coverUrl}" alt="" loading="lazy" draggable="false">`
-      : initials(track.artist);
+      ? `<img src="${escapeHtml(track.coverUrl)}" alt="" loading="lazy" draggable="false">`
+      : escapeHtml(initials(track.artist));
     const coverStyle = track.coverUrl ? '' : `style="background:${gradientFor(track.id)}"`;
 
     card.innerHTML = `
       <div class="track-cover" ${coverStyle}>${coverInner}</div>
       <div class="track-info">
-        <div class="track-title">${track.title}</div>
-        <div class="track-artist">${track.artist}</div>
+        <div class="track-title">${escapeHtml(track.title)}</div>
+        <div class="track-artist">${escapeHtml(track.artist)}</div>
       </div>
       <span class="track-meta">${formatDuration(track.durationMs)}</span>
       <span class="track-check" aria-hidden="true">
@@ -503,12 +513,12 @@
       const chip = document.createElement('div');
       chip.className = 'tray-chip';
       const coverInner = track.coverUrl
-        ? `<img src="${track.coverUrl}" alt="" loading="lazy" draggable="false">`
-        : initials(track.artist);
+        ? `<img src="${escapeHtml(track.coverUrl)}" alt="" loading="lazy" draggable="false">`
+        : escapeHtml(initials(track.artist));
       const coverStyle = track.coverUrl ? '' : `style="background:${gradientFor(track.id)}"`;
       chip.innerHTML = `
         <span class="tray-chip-cover" ${coverStyle}>${coverInner}</span>
-        <span class="tray-chip-label">${track.title}</span>
+        <span class="tray-chip-label">${escapeHtml(track.title)}</span>
       `;
       trayStrip.appendChild(chip);
     });
@@ -802,8 +812,8 @@
       btn.type = 'button';
       btn.className = 'playlist-album-cover-option';
       btn.innerHTML = `
-        <img src="${choice.coverUrl}" alt="" loading="lazy" draggable="false">
-        <span>${choice.album}</span>
+        <img src="${escapeHtml(choice.coverUrl)}" alt="" loading="lazy" draggable="false">
+        <span>${escapeHtml(choice.album)}</span>
       `;
       btn.addEventListener('click', () => {
         setPlaylistCover(choice.coverUrl);
@@ -825,15 +835,15 @@
       item.draggable = false;
 
       const coverInner = track.coverUrl
-        ? `<img src="${track.coverUrl}" alt="" loading="lazy" draggable="false">`
-        : initials(track.artist);
+        ? `<img src="${escapeHtml(track.coverUrl)}" alt="" loading="lazy" draggable="false">`
+        : escapeHtml(initials(track.artist));
       const coverStyle = track.coverUrl ? '' : `style="background:${gradientFor(track.id)}"`;
 
       item.innerHTML = `
         <div class="composer-track-cover" ${coverStyle}>${coverInner}</div>
         <div class="composer-track-info">
-          <div class="composer-track-title">${track.title}</div>
-          <div class="composer-track-artist">${track.artist}</div>
+          <div class="composer-track-title">${escapeHtml(track.title)}</div>
+          <div class="composer-track-artist">${escapeHtml(track.artist)}</div>
         </div>
         <button type="button" class="composer-track-remove" aria-label="삭제">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -946,7 +956,7 @@
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || '플레이리스트를 저장하지 못했어요.');
-      location.href = `/playlist/playlist.html?id=${encodeURIComponent(data.playlist.id)}`;
+      location.href = `/playlist-share/playlist-share.html?id=${encodeURIComponent(data.playlist.id)}`;
     } catch (err) {
       playlistTitleError.textContent = err.message;
       playlistSaveBtn.disabled = false;
@@ -1097,15 +1107,15 @@
       item.dataset.index = i;
 
       const coverInner = track.coverUrl
-        ? `<img src="${track.coverUrl}" alt="" loading="lazy" draggable="false">`
-        : initials(track.artist);
+        ? `<img src="${escapeHtml(track.coverUrl)}" alt="" loading="lazy" draggable="false">`
+        : escapeHtml(initials(track.artist));
       const coverStyle = track.coverUrl ? '' : `style="background:${gradientFor(track.id)}"`;
 
       item.innerHTML = `
         <div class="selected-track-cover" ${coverStyle}>${coverInner}</div>
         <div class="selected-track-info">
-          <div class="selected-track-title">${track.title}</div>
-          <div class="selected-track-artist">${track.artist}</div>
+          <div class="selected-track-title">${escapeHtml(track.title)}</div>
+          <div class="selected-track-artist">${escapeHtml(track.artist)}</div>
         </div>
         <button type="button" class="selected-track-remove" aria-label="삭제">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1144,8 +1154,8 @@
      커버 HTML 헬퍼
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
   function buildCoverCellHtml(coverUrl, label) {
-    if (coverUrl) return `<img src="${coverUrl}" alt="" loading="lazy" draggable="false">`;
-    return initials(label);
+    if (coverUrl) return `<img src="${escapeHtml(coverUrl)}" alt="" loading="lazy" draggable="false">`;
+    return escapeHtml(initials(label));
   }
 
   function updateModalText({ title, artist, album }) {

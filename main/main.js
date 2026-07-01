@@ -59,7 +59,7 @@
   }
 
   function playlistUrl(id) {
-    return `../playlist/playlist.html?id=${encodeURIComponent(id)}`;
+    return `../playlist-share/playlist-share.html?id=${encodeURIComponent(id)}`;
   }
 
   /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -528,7 +528,7 @@
         </button>
         <div class="nav-dropdown" id="navDropdown" role="menu" hidden>
           <a href="#" class="nav-dropdown-item" data-action="profile" role="menuitem">프로필</a>
-          <a href="../playlist/playlist.html?saved=1" class="nav-dropdown-item" data-action="library" role="menuitem">보관함</a>
+          <a href="../playlist-share/playlist-share.html?saved=1" class="nav-dropdown-item" data-action="library" role="menuitem">보관함</a>
           <a href="#" class="nav-dropdown-item" data-action="settings" role="menuitem">설정</a>
           <div class="nav-dropdown-divider"></div>
           <button type="button" class="nav-dropdown-item nav-dropdown-item--danger" id="navLogoutBtn" role="menuitem">로그아웃</button>

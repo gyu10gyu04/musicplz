@@ -140,6 +140,7 @@ app.use('/main', express.static(path.join(__dirname, '..', 'main')));
 app.use('/login', express.static(path.join(__dirname, '..', 'login')));
 app.use('/create', express.static(path.join(__dirname, '..', 'create')));
 app.use('/playlist', express.static(path.join(__dirname, '..', 'playlist')));
+app.use('/playlist-share', express.static(path.join(__dirname, '..', 'playlist-share')));
 
 /* 루트 접속 시 홈으로 리다이렉트 */
 app.get('/', (req, res) => res.redirect('/main/main.html'));

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>플레이리스트공유 — MusicPlz</title>
+  <link rel="stylesheet" href="playlist-share.css">
+</head>
+<body>
+  <div class="noise-layer"></div>
+
+  <nav>
+    <a href="../main/main.html" class="logo" aria-label="MusicPlz">
+      <svg width="102.82" height="17.20" viewBox="0 0 59 10" xmlns="http://www.w3.org/2000/svg" fill="none" aria-hidden="true">
+        <path d="M2.63256 9.648H0L0.216 0.408H4.86L5.364 3.516H5.472L5.976 0.408H10.584L10.7523 7.60767L9.68752 9.648H7.236V4.848H7.128L6.69335 7.60767L5.65205 9.648H4.428L3.672 4.728H3.564V7.60767L2.63256 9.648Z" fill="#0a0a0a"/>
+        <path d="M18 9.648H15.9306C15.8746 9.408 15.8306 9.152 15.7986 8.88C15.7746 8.608 15.7626 8.34 15.7626 8.076H15.6546C15.6546 8.38 15.5906 8.668 15.4626 8.94C15.3426 9.204 15.1426 9.42 14.8626 9.588C14.5906 9.748 14.2186 9.828 13.7466 9.828C13.1466 9.828 12.6706 9.752 12.3186 9.6C11.9746 9.448 11.7186 9.24 11.5506 8.976C11.3906 8.712 11.2866 8.404 11.2386 8.052C11.1906 7.7 11.1626 7.324 11.1546 6.924V2.208H14.6706V6.648C14.6706 6.672 14.6826 6.732 14.7066 6.828C14.7386 6.924 14.8346 6.972 14.9946 6.972C15.1546 6.972 15.2466 6.924 15.2706 6.828C15.3026 6.732 15.3186 6.672 15.3186 6.648V2.208H18.8706V7.032C18.8706 7.12 18.8706 7.288 18.8706 7.536C18.8626 7.24 18.8786 7.776 18.8706 7.536C18.8546 7.288 18.8786 7.832 18.8706 7.536C18.8866 7.776 17.976 9.56 18 9.648Z" fill="#0a0a0a"/>
+        <path d="M25.8148 5.484C25.4628 5.268 25.0828 5.108 24.6748 5.004C24.2748 4.9 23.7948 4.828 23.2348 4.788C23.1788 4.788 23.1308 4.788 23.0908 4.788C23.0508 4.78 23.0108 4.776 22.9708 4.776C22.8268 4.776 22.7548 4.832 22.7548 4.944C22.7548 5.008 22.7948 5.052 22.8748 5.076C22.9548 5.092 23.0588 5.112 23.1868 5.136C23.5148 5.168 23.8628 5.216 24.2308 5.28C24.5988 5.336 24.9428 5.44 25.2628 5.592C25.5828 5.744 25.8428 5.976 26.0428 6.288C26.2428 6.592 26.3428 7.008 26.3428 7.536C26.3428 7.976 26.2428 8.344 26.0428 8.64C25.8428 8.936 25.5668 9.172 25.2148 9.348C24.8708 9.516 24.4788 9.636 24.0388 9.708C23.5988 9.788 23.1388 9.828 22.6588 9.828C22.0508 9.828 21.4388 9.78 20.8228 9.684C20.2148 9.596 19.6788 9.5 19.2148 9.396L19.5028 6.048C19.6548 6.152 19.8388 6.272 20.0548 6.408C20.2788 6.536 20.5748 6.656 20.9428 6.768C21.3108 6.88 21.7988 6.964 22.4068 7.02C22.4388 7.028 22.4668 7.032 22.4908 7.032C22.5228 7.032 22.5548 7.032 22.5868 7.032C22.7308 7.032 22.8028 6.98 22.8028 6.876C22.8028 6.804 22.7708 6.756 22.7068 6.732C22.6428 6.708 22.5428 6.688 22.4068 6.672C22.0468 6.624 21.6868 6.564 21.3268 6.492C20.9748 6.42 20.6508 6.308 20.3548 6.156C20.0588 6.004 19.8188 5.792 19.6348 5.52C19.4588 5.24 19.3708 4.88 19.3708 4.44C19.3708 3.84 19.5188 3.364 19.8148 3.012C20.1188 2.66 20.5268 2.408 21.0388 2.256C21.5508 2.096 22.1188 2.016 22.7428 2.016C23.2788 2.016 23.8348 2.06 24.4108 2.148C24.9868 2.228 25.5548 2.336 26.1148 2.472L25.8148 5.484Z" fill="#0a0a0a"/>
+        <path d="M26.707 1.8551V0H30V1.8551H26.707ZM29 9.5H26.707V2.17413H30V7.536L29 9.5Z" fill="#0a0a0a"/>
+        <path d="M34.7471 6.036L38.0951 6.228V7.128C38.0951 7.976 37.7631 8.64 37.0991 9.12C36.4351 9.592 35.5071 9.828 34.3151 9.828C33.6511 9.828 33.0471 9.724 32.5031 9.516C31.9591 9.308 31.5191 9.004 31.1831 8.604C30.8551 8.204 30.6751 7.72 30.6431 7.152C30.6351 7.04 30.6271 6.872 30.6191 6.648C30.6191 6.416 30.6191 6.152 30.6191 5.856C30.6191 5.568 30.6191 5.316 30.6191 5.1C30.6271 4.876 30.6351 4.712 30.6431 4.608C30.6751 4.056 30.8551 3.588 31.1831 3.204C31.5191 2.812 31.9591 2.516 32.5031 2.316C33.0471 2.116 33.6511 2.016 34.3151 2.016C35.0911 2.016 35.7591 2.116 36.3191 2.316C36.8871 2.516 37.3231 2.808 37.6271 3.192C37.9391 3.568 38.0951 4.024 38.0951 4.56V5.256L34.7471 5.628V5.196C34.7471 4.98 34.6391 4.872 34.4231 4.872C34.2071 4.872 34.0991 4.98 34.0991 5.196V6.54C34.0991 6.756 34.2071 6.864 34.4231 6.864C34.6391 6.864 34.7471 6.756 34.7471 6.54V6.036Z" fill="#0a0a0a"/>
+        <path d="M41.5 9L38.5784 9.648V0.408H44.1824C44.6944 0.408 45.1624 0.508 45.5864 0.707999C46.0184 0.9 46.3624 1.24 46.6184 1.728C46.8744 2.208 47.0024 2.876 47.0024 3.732C47.0024 4.572 46.8704 5.24 46.6064 5.736C46.3424 6.224 45.9944 6.576 45.5624 6.792C45.1384 7 44.6784 7.104 44.1824 7.104H42.3584L41.5 9ZM43.2944 3.444H42.1424V4.092H43.3304C43.3944 4.092 43.4624 4.072 43.5344 4.032C43.6144 3.992 43.6544 3.908 43.6544 3.78C43.6544 3.644 43.6104 3.556 43.5224 3.516C43.4344 3.468 43.3584 3.444 43.2944 3.444Z" fill="#7c3aed"/>
+        <path d="M51.5652 7.5L51.0732 9C50.8252 9.056 50.3552 9.744 50.0112 9.768C49.6752 9.8 50.2132 9.768 49.9092 9.768C49.4132 9.768 48.9772 9.688 48.6012 9.528C48.2332 9.36 47.9452 9.056 47.7372 8.616C47.5372 8.176 47.4372 7.54 47.4372 6.708V0H50.8932V6.996C50.8932 7.22 50.9532 7.368 51.0732 7.44C51.2012 7.512 51.3652 7.532 51.5652 7.5Z" fill="#7c3aed"/>
+        <path d="M58.6456 4.44L56.2456 7.02H58.7536L57.824 9.18L51.8416 9.828V7.776L54.2656 5.196H52.0576V2.388H58.6456V4.44Z" fill="#7c3aed"/>
+      </svg>
+    </a>
+    <a href="../create/create.html" class="nav-create">플레이리스트 만들기</a>
+  </nav>
+
+  <main class="share-wrap">
+    <section class="share-hero">
+      <p class="tagline">Playlist Share</p>
+      <h1>플레이리스트공유</h1>
+      <p>다른 사용자가 만든 플레이리스트를 둘러보고 저장해보세요.</p>
+    </section>
+
+    <section class="toolbar" id="listToolbar">
+      <input type="search" id="playlistSearch" placeholder="플리 이름 검색">
+      <div class="sort-tabs" role="tablist" aria-label="정렬">
+        <button type="button" class="sort-tab is-active" data-sort="latest">날짜순</button>
+        <button type="button" class="sort-tab" data-sort="popular">인기순</button>
+      </div>
+    </section>
+
+    <section class="playlist-grid" id="playlistGrid"></section>
+    <section class="empty-state" id="emptyState" hidden>아직 보여줄 플레이리스트가 없습니다.</section>
+
+    <section class="playlist-detail" id="playlistDetail" hidden>
+      <button type="button" class="back-btn" id="backToList">← 목록으로</button>
+      <div class="detail-head">
+        <img id="detailCover" alt="" class="detail-cover">
+        <div class="detail-meta">
+          <p class="tagline">Shared Playlist</p>
+          <h2 id="detailTitle"></h2>
+          <p id="detailByline"></p>
+          <div class="detail-actions">
+            <button type="button" id="likeBtn">좋아요</button>
+            <button type="button" id="saveBtn">저장</button>
+          </div>
+        </div>
+      </div>
+      <div class="detail-track-list" id="detailTrackList"></div>
+    </section>
+  </main>
+
+  <div class="quick-card-backdrop" id="quickCardBackdrop" hidden>
+    <div class="quick-card" id="quickCard">
+      <button type="button" class="quick-card-close" id="quickCardClose" aria-label="닫기">×</button>
+      <div class="quick-info-pane">
+        <img id="quickCover" alt="" class="quick-cover">
+        <div class="quick-meta">
+          <p class="tagline">Playlist Info</p>
+          <h2 id="quickTitle"></h2>
+          <p id="quickOwner"></p>
+          <div class="quick-stats" id="quickStats"></div>
+          <div class="quick-owner-actions" id="quickOwnerActions" hidden>
+            <button type="button" id="quickEditBtn">수정</button>
+            <button type="button" id="quickDeleteBtn" class="danger">삭제</button>
+          </div>
+        </div>
+      </div>
+      <div class="quick-chat-pane">
+        <div class="quick-chat-head">채팅</div>
+        <div class="quick-comments" id="quickComments"></div>
+        <div class="quick-reply-state" id="quickReplyState" hidden></div>
+        <div class="quick-comment-form">
+          <input type="text" id="quickCommentInput" maxlength="500" placeholder="댓글 달기">
+          <button type="button" id="quickCommentSend">등록</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <svg class="wave-transition" id="waveTransition" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+    <path id="wavePath" d="M0,100 L0,100 C25,100 75,100 100,100 L100,100 Z"></path>
+  </svg>
+
+  <script src="playlist-share.js"></script>
+</body>
+</html>
