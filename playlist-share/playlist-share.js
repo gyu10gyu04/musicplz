@@ -89,6 +89,36 @@
     requestAnimationFrame(step);
   }
 
+  let csrfTokenPromise = null;
+
+  async function getCsrfToken() {
+    if (!csrfTokenPromise) {
+      csrfTokenPromise = fetch('/api/csrf-token', { credentials: 'same-origin' })
+        .then(res => {
+          if (!res.ok) throw new Error('CSRF token request failed');
+          return res.json();
+        })
+        .then(data => data.csrfToken || '');
+    }
+    return csrfTokenPromise;
+  }
+
+  async function secureFetch(url, options = {}) {
+    const method = String(options.method || 'GET').toUpperCase();
+    if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+      return fetch(url, { credentials: 'same-origin', ...options });
+    }
+    const csrfToken = await getCsrfToken();
+    return fetch(url, {
+      credentials: 'same-origin',
+      ...options,
+      headers: {
+        ...(options.headers || {}),
+        'X-CSRF-Token': csrfToken,
+      },
+    });
+  }
+
   async function loadList() {
     const params = new URLSearchParams({ sort });
     const q = playlistSearch.value.trim();
@@ -228,7 +258,7 @@
 
   async function toggleAction(type) {
     if (!currentPlaylist) return;
-    const res = await fetch(`/api/playlists/${currentPlaylist.id}/${type}`, {
+    const res = await secureFetch(`/api/playlists/${currentPlaylist.id}/${type}`, {
       method: 'POST',
       credentials: 'same-origin',
     });
@@ -243,7 +273,7 @@
     if (!quickPlaylist || !quickPlaylist.isOwner) return;
     if (!confirm(`"${quickPlaylist.title}" 플레이리스트를 삭제할까요?\n\n이 플레이리스트를 저장한 모든 사용자의 보관함에서도 지워집니다.`)) return;
 
-    const res = await fetch(`/api/playlists/${quickPlaylist.id}`, {
+    const res = await secureFetch(`/api/playlists/${quickPlaylist.id}`, {
       method: 'DELETE',
       credentials: 'same-origin',
     });
@@ -300,7 +330,7 @@
       });
 
       item.querySelector('[data-action="like"]').addEventListener('click', async () => {
-        const res = await fetch(`/api/playlists/comments/${comment.id}/like`, { method: 'POST', credentials: 'same-origin' });
+        const res = await secureFetch(`/api/playlists/comments/${comment.id}/like`, { method: 'POST', credentials: 'same-origin' });
         if (!res.ok) return alert('로그인이 필요합니다.');
         loadQuickComments();
       });
@@ -310,7 +340,7 @@
         editBtn.addEventListener('click', async () => {
           const content = prompt('댓글 수정', comment.content);
           if (!content || !content.trim()) return;
-          const res = await fetch(`/api/playlists/comments/${comment.id}`, {
+          const res = await secureFetch(`/api/playlists/comments/${comment.id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'same-origin',
@@ -325,7 +355,7 @@
       if (deleteBtn) {
         deleteBtn.addEventListener('click', async () => {
           if (!confirm('댓글을 삭제할까요?')) return;
-          const res = await fetch(`/api/playlists/comments/${comment.id}`, { method: 'DELETE', credentials: 'same-origin' });
+          const res = await secureFetch(`/api/playlists/comments/${comment.id}`, { method: 'DELETE', credentials: 'same-origin' });
           if (!res.ok) return alert('삭제하지 못했어요.');
           loadQuickComments();
         });
@@ -340,7 +370,7 @@
     const content = quickCommentInput.value.trim();
     if (!content) return;
 
-    const res = await fetch(`/api/playlists/${quickPlaylist.id}/comments`, {
+    const res = await secureFetch(`/api/playlists/${quickPlaylist.id}/comments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',

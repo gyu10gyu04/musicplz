@@ -107,6 +107,36 @@
     }[ch]));
   }
 
+  let csrfTokenPromise = null;
+
+  async function getCsrfToken() {
+    if (!csrfTokenPromise) {
+      csrfTokenPromise = fetch('/api/csrf-token', { credentials: 'same-origin' })
+        .then(res => {
+          if (!res.ok) throw new Error('보안 토큰을 불러오지 못했어요. 새로고침 후 다시 시도해주세요.');
+          return res.json();
+        })
+        .then(data => data.csrfToken || '');
+    }
+    return csrfTokenPromise;
+  }
+
+  async function secureFetch(url, options = {}) {
+    const method = String(options.method || 'GET').toUpperCase();
+    if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+      return fetch(url, { credentials: 'same-origin', ...options });
+    }
+    const csrfToken = await getCsrfToken();
+    return fetch(url, {
+      credentials: 'same-origin',
+      ...options,
+      headers: {
+        ...(options.headers || {}),
+        'X-CSRF-Token': csrfToken,
+      },
+    });
+  }
+
   function gradientFor(seed) {
     // 곡 id 문자열을 간단히 해시해서 항상 같은 그라디언트가 나오도록 함
     let hash = 0;
@@ -292,7 +322,7 @@
     currentAbortController = new AbortController();
 
     try {
-      const res = await fetch('/api/music/search', {
+      const res = await secureFetch('/api/music/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
@@ -792,7 +822,7 @@
   }
 
   async function fetchPlaylistAlbumCoverChoices() {
-    const res = await fetch('/api/music/playlist-cover-candidates', {
+    const res = await secureFetch('/api/music/playlist-cover-candidates', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
@@ -948,7 +978,7 @@
     playlistSaveBtn.textContent = '저장 중...';
 
     try {
-      const res = await fetch('/api/playlists', {
+      const res = await secureFetch('/api/playlists', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',

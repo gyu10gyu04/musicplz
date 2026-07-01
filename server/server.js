@@ -13,6 +13,7 @@
 require('dotenv').config();
 
 const path = require('path');
+const crypto = require('crypto');
 const express = require('express');
 const session = require('express-session');
 const pgSession = require('connect-pg-simple')(session);
@@ -38,11 +39,28 @@ app.set('trust proxy', 1);
 
 /* ─── 기본 보안 헤더 ─── */
 app.use((req, res, next) => {
+  const csp = [
+    "default-src 'self'",
+    "base-uri 'self'",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    "form-action 'self'",
+    "script-src 'self' https://challenges.cloudflare.com",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: https: http:",
+    "font-src 'self' data:",
+    "connect-src 'self'",
+    "frame-src https://challenges.cloudflare.com",
+  ];
+  if (IS_PROD) csp.push('upgrade-insecure-requests');
+
+  res.setHeader('Content-Security-Policy', csp.join('; '));
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
   if (IS_PROD) {
     res.setHeader('Strict-Transport-Security', 'max-age=15552000; includeSubDomains');
   }
@@ -87,22 +105,73 @@ setInterval(() => {
 function sameOriginOnly(req, res, next) {
   if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
 
+  const fetchSite = req.get('sec-fetch-site');
+  if (fetchSite && !['same-origin', 'same-site', 'none'].includes(fetchSite)) {
+    return res.status(403).json({ error: '허용되지 않은 요청 출처입니다.' });
+  }
+
   const origin = req.get('origin');
-  if (!origin) return next();
+  const referer = req.get('referer');
 
   const expectedOrigin = `${req.protocol}://${req.get('host')}`;
-  if (origin !== expectedOrigin) {
+  if (origin && origin !== expectedOrigin) {
     return res.status(403).json({ error: '허용되지 않은 요청 출처입니다.' });
+  }
+  if (!origin && referer) {
+    let refererOrigin = '';
+    try {
+      refererOrigin = new URL(referer).origin;
+    } catch {
+      return res.status(403).json({ error: '허용되지 않은 요청 출처입니다.' });
+    }
+    if (refererOrigin !== expectedOrigin) {
+      return res.status(403).json({ error: '허용되지 않은 요청 출처입니다.' });
+    }
   }
 
   next();
 }
+
+function safeEqual(a, b) {
+  const left = Buffer.from(String(a || ''));
+  const right = Buffer.from(String(b || ''));
+  return left.length === right.length && crypto.timingSafeEqual(left, right);
+}
+
+function csrfProtection(req, res, next) {
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
+
+  const token = req.get('x-csrf-token');
+  if (!req.session?.csrfToken || !token || !safeEqual(token, req.session.csrfToken)) {
+    return res.status(403).json({ error: '요청 보안 토큰이 올바르지 않습니다. 새로고침 후 다시 시도해주세요.' });
+  }
+
+  next();
+}
+
+function rejectNonJsonBody(req, res, next) {
+  if (!['POST', 'PUT', 'PATCH'].includes(req.method)) return next();
+  if (!['/auth/logout'].includes(req.path) && req.is('application/json') !== 'application/json') {
+    const hasBody = Number(req.get('content-length') || 0) > 0 || req.get('transfer-encoding');
+    if (hasBody) return res.status(415).json({ error: 'JSON 요청만 허용됩니다.' });
+  }
+
+  next();
+}
+
+app.use((req, res, next) => {
+  if (req.method === 'TRACE') {
+    return res.status(403).json({ error: '허용되지 않은 요청 출처입니다.' });
+  }
+  next();
+});
 
 /* ─── 바디 파서 ─── */
 app.use(express.json({ limit: '4mb' }));
 
 app.use('/api', rateLimit({ windowMs: 60 * 1000, max: 120, keyPrefix: 'api' }));
 app.use('/api', sameOriginOnly);
+app.use('/api', rejectNonJsonBody);
 
 /* ─── 세션 설정 ───
    세션 데이터는 connect-pg-simple을 통해 PostgreSQL의 별도 테이블(session)에
@@ -127,6 +196,15 @@ app.use(session({
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7일
   },
 }));
+
+app.get('/api/csrf-token', (req, res) => {
+  if (!req.session.csrfToken) {
+    req.session.csrfToken = crypto.randomBytes(32).toString('base64url');
+  }
+  res.json({ csrfToken: req.session.csrfToken });
+});
+
+app.use('/api', csrfProtection);
 
 /* ─── API 라우트 ─── */
 app.use('/api/auth', authRoutes);

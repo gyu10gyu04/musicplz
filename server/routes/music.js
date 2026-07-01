@@ -14,9 +14,29 @@ const { searchTracks, getAlbumTracks, getArtistAlbums, searchAlbumsByArtistAndNa
 
 const router = express.Router();
 
+function cleanText(value, maxLength) {
+  return String(value || '').replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, maxLength);
+}
+
+function isSafeSpotifyId(value) {
+  return /^[0-9A-Za-z]{1,80}$/.test(String(value || ''));
+}
+
+function parseOffset(value) {
+  const offset = Number.parseInt(value, 10);
+  if (!Number.isSafeInteger(offset) || offset < 0) return 0;
+  return Math.min(offset, 1000);
+}
+
 router.post('/playlist-cover-candidates', async (req, res, next) => {
   try {
-    const tracks = Array.isArray(req.body?.tracks) ? req.body.tracks.slice(0, 12) : [];
+    const tracks = Array.isArray(req.body?.tracks)
+      ? req.body.tracks.slice(0, 12).map(track => ({
+        title: cleanText(track?.title, 200),
+        artist: cleanText(track?.artist || track?.primaryArtist, 200),
+        primaryArtist: cleanText(track?.primaryArtist || track?.artist, 200),
+      })).filter(track => track.title || track.artist || track.primaryArtist)
+      : [];
     if (tracks.length === 0) {
       return res.json({ covers: [] });
     }
@@ -45,8 +65,8 @@ router.post('/playlist-cover-candidates', async (req, res, next) => {
 
       covers.push({
         coverUrl: track.coverUrl,
-        album: track.album || track.title || '앨범',
-        artist: track.primaryArtist || track.artist || '',
+        album: cleanText(track.album || track.title || '앨범', 200),
+        artist: cleanText(track.primaryArtist || track.artist, 200),
       });
     }
 
@@ -68,7 +88,7 @@ router.post('/search', async (req, res, next) => {
       return res.status(400).json({ error: '검색어를 입력해주세요.' });
     }
 
-    const userQuery = String(query).trim().slice(0, 200);
+    const userQuery = cleanText(query, 200);
 
     let interpretation;
     try {
@@ -82,15 +102,16 @@ router.post('/search', async (req, res, next) => {
       };
     }
 
-    const tracks = await searchTracks(interpretation.searchQuery, 10);
+    const searchQuery = cleanText(interpretation.searchQuery || userQuery, 200);
+    const tracks = await searchTracks(searchQuery, 10);
 
-    console.log(`[검색 결과] "${interpretation.searchQuery}" → ${tracks.length}곡:`,
+    console.log(`[검색 결과] "${searchQuery}" → ${tracks.length}곡:`,
       tracks.map(t => `${t.title}(artistId=${t.artistId})`).join(' / '));
 
     res.json({
-      interpretation: interpretation.interpretation,
-      tags: interpretation.tags,
-      searchQuery: interpretation.searchQuery,
+      interpretation: cleanText(interpretation.interpretation, 300),
+      tags: Array.isArray(interpretation.tags) ? interpretation.tags.map(tag => cleanText(tag, 40)).filter(Boolean).slice(0, 8) : [],
+      searchQuery,
       tracks,
     });
   } catch (err) {
@@ -106,7 +127,8 @@ router.post('/search', async (req, res, next) => {
 router.get('/album/:albumId', async (req, res, next) => {
   try {
     const { albumId } = req.params;
-    const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+    if (!isSafeSpotifyId(albumId)) return res.status(400).json({ error: '올바르지 않은 앨범입니다.' });
+    const offset = parseOffset(req.query.offset);
 
     const { tracks, total, hasMore, album } = await getAlbumTracks(albumId, offset, 20);
 
@@ -122,7 +144,7 @@ router.get('/album/:albumId', async (req, res, next) => {
       total,
       hasMore,
       nextOffset: hasMore ? offset + tracks.length : null,
-      representativeTrackTitle: representativeTrack?.title || null,
+      representativeTrackTitle: representativeTrack?.title ? cleanText(representativeTrack.title, 200) : null,
     });
   } catch (err) {
     next(err);
@@ -141,8 +163,9 @@ router.get('/album/:albumId', async (req, res, next) => {
 router.get('/artist/:artistId/albums', async (req, res, next) => {
   try {
     const { artistId } = req.params;
-    const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
-    const artistName = String(req.query.artistName || '').trim().slice(0, 120);
+    if (!isSafeSpotifyId(artistId)) return res.status(400).json({ error: '올바르지 않은 아티스트입니다.' });
+    const offset = parseOffset(req.query.offset);
+    const artistName = cleanText(req.query.artistName, 120);
 
     console.log(`[아티스트 앨범 조회] artistId="${artistId}", artistName="${artistName}", offset=${offset}`);
 

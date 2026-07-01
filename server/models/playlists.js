@@ -1,5 +1,27 @@
 const { pool } = require('../db');
 
+const SAFE_TEXT_RE = /[\u0000-\u001f\u007f]/g;
+const SAFE_IMAGE_FALLBACK = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
+
+function cleanText(value, maxLength = 500) {
+  return String(value || '').replace(SAFE_TEXT_RE, '').trim().slice(0, maxLength);
+}
+
+function safeImageUrl(value) {
+  const url = String(value || '').trim();
+  if (/^data:image\/(?:png|jpe?g|webp);base64,[a-z0-9+/=]+$/i.test(url)) return url;
+  if (/[\u0000-\u001f\u007f<>"'`\s]/.test(url)) return SAFE_IMAGE_FALLBACK;
+
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === 'https:' || parsed.protocol === 'http:') return parsed.href;
+  } catch {
+    // fall through to safe placeholder
+  }
+
+  return SAFE_IMAGE_FALLBACK;
+}
+
 async function createPlaylist({ userId, title, coverUrl, tracks }) {
   const client = await pool.connect();
   try {
@@ -130,15 +152,33 @@ async function getPlaylistById({ playlistId, userId = null }) {
   return {
     ...publicPlaylistRow(playlist, userId),
     tracks: tracksResult.rows.map(row => ({
-      id: row.spotify_track_id,
-      title: row.title,
-      artist: row.artist,
-      album: row.album,
-      coverUrl: row.cover_url,
+      id: cleanText(row.spotify_track_id, 120),
+      title: cleanText(row.title, 200),
+      artist: cleanText(row.artist, 200),
+      album: cleanText(row.album, 200),
+      coverUrl: row.cover_url ? safeImageUrl(row.cover_url) : null,
       durationMs: row.duration_ms,
       position: row.position,
     })),
   };
+}
+
+async function commentBelongsToPlaylist({ commentId, playlistId }) {
+  const { rows } = await pool.query(
+    `SELECT 1 FROM playlist_comments WHERE id = $1 AND playlist_id = $2`,
+    [commentId, playlistId]
+  );
+  return Boolean(rows[0]);
+}
+
+async function playlistExists(playlistId) {
+  const { rows } = await pool.query(`SELECT 1 FROM playlists WHERE id = $1`, [playlistId]);
+  return Boolean(rows[0]);
+}
+
+async function commentExists(commentId) {
+  const { rows } = await pool.query(`SELECT 1 FROM playlist_comments WHERE id = $1`, [commentId]);
+  return Boolean(rows[0]);
 }
 
 async function togglePlaylistLike({ playlistId, userId }) {
@@ -259,10 +299,10 @@ function publicPlaylistRow(row, currentUserId = null) {
   return {
     id: row.id,
     ownerId: row.user_id,
-    title: row.title,
-    coverUrl: row.cover_url,
+    title: cleanText(row.title, 80),
+    coverUrl: safeImageUrl(row.cover_url),
     createdAt: row.created_at,
-    displayName: row.display_name,
+    displayName: cleanText(row.display_name, 40),
     trackCount: row.track_count ?? undefined,
     likeCount: row.like_count || 0,
     saveCount: row.save_count || 0,
@@ -278,10 +318,10 @@ function publicCommentRow(row, currentUserId = null) {
     playlistId: row.playlist_id,
     userId: row.user_id,
     parentCommentId: row.parent_comment_id,
-    content: row.content,
+    content: cleanText(row.content, 500),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    displayName: row.display_name,
+    displayName: cleanText(row.display_name, 40),
     likeCount: row.like_count || 0,
     liked: Boolean(row.liked),
     isOwner: currentUserId !== null && Number(row.user_id) === Number(currentUserId),
@@ -300,4 +340,7 @@ module.exports = {
   updateComment,
   deleteComment,
   toggleCommentLike,
+  commentBelongsToPlaylist,
+  playlistExists,
+  commentExists,
 };

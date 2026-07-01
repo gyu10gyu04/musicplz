@@ -173,6 +173,19 @@
 
   const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const DISPLAY_NAME_RE = /^[0-9A-Za-z가-힣_.-]+$/;
+  let csrfTokenPromise = null;
+
+  async function getCsrfToken() {
+    if (!csrfTokenPromise) {
+      csrfTokenPromise = fetch('/api/csrf-token', { credentials: 'same-origin' })
+        .then(res => {
+          if (!res.ok) throw new Error('보안 토큰을 불러오지 못했어요. 새로고침 후 다시 시도해주세요.');
+          return res.json();
+        })
+        .then(data => data.csrfToken || '');
+    }
+    return csrfTokenPromise;
+  }
 
   function normalizedDisplayName() {
     return displayNameInput.value.trim().replace(/\s+/g, ' ');
@@ -360,9 +373,10 @@
      API 호출
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
   async function callAuthApi(path, payload) {
+    const csrfToken = await getCsrfToken();
     const res = await fetch(`/api/auth/${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
       credentials: 'same-origin', // 세션 쿠키 송수신
       body: JSON.stringify(payload),
     });

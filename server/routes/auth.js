@@ -16,6 +16,7 @@ const BCRYPT_ROUNDS = 10;
 const PG_UNIQUE_VIOLATION = '23505';
 const MAX_PASSWORD_LENGTH = 72; // bcrypt는 72바이트 이후를 무시하므로 길이를 제한합니다.
 const DISPLAY_NAME_RE = /^[0-9A-Za-z가-힣_.-]+$/;
+const SAFE_TEXT_RE = /[\u0000-\u001f\u007f]/g;
 
 const authBuckets = new Map();
 
@@ -66,6 +67,10 @@ function validatePassword(password) {
 
 function normalizeDisplayName(displayName) {
   return String(displayName || '').trim().replace(/\s+/g, ' ');
+}
+
+function cleanPublicText(value, maxLength) {
+  return String(value || '').replace(SAFE_TEXT_RE, '').trim().slice(0, maxLength);
 }
 
 function validateDisplayName(displayName) {
@@ -143,7 +148,11 @@ function rejectSignupWhileLoggedIn(req, res, next) {
 
 function publicUser(user) {
   if (!user) return null;
-  return { id: user.id, email: user.email, displayName: user.display_name };
+  return {
+    id: user.id,
+    email: cleanPublicText(user.email, 254),
+    displayName: cleanPublicText(user.display_name, 40),
+  };
 }
 
 router.get('/security-config', (req, res) => {

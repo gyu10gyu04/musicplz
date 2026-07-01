@@ -66,6 +66,36 @@
     return '../playlist-share/playlist-share.html';
   }
 
+  let csrfTokenPromise = null;
+
+  async function getCsrfToken() {
+    if (!csrfTokenPromise) {
+      csrfTokenPromise = fetch('/api/csrf-token', { credentials: 'same-origin' })
+        .then(res => {
+          if (!res.ok) throw new Error('CSRF token request failed');
+          return res.json();
+        })
+        .then(data => data.csrfToken || '');
+    }
+    return csrfTokenPromise;
+  }
+
+  async function secureFetch(url, options = {}) {
+    const method = String(options.method || 'GET').toUpperCase();
+    if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+      return fetch(url, { credentials: 'same-origin', ...options });
+    }
+    const csrfToken = await getCsrfToken();
+    return fetch(url, {
+      credentials: 'same-origin',
+      ...options,
+      headers: {
+        ...(options.headers || {}),
+        'X-CSRF-Token': csrfToken,
+      },
+    });
+  }
+
   /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
      카드 스프레드 시스템
      섹션 2가 화면에 들어오면서 카드 덱이 펼쳐짐
@@ -528,12 +558,14 @@
 
   function renderLoggedIn(user) {
     const label = user.displayName || user.email;
+    const safeLabel = escapeHtml(label);
+    const safeInitial = escapeHtml(initials(label));
 
     navAuth.innerHTML = `
       <div class="nav-account">
         <button type="button" class="nav-account-trigger" id="navAccountTrigger" aria-haspopup="true" aria-expanded="false">
-          <span class="nav-avatar">${initials(label)}</span>
-          <span class="nav-account-name">${label}</span>
+          <span class="nav-avatar">${safeInitial}</span>
+          <span class="nav-account-name">${safeLabel}</span>
           <svg class="nav-caret" viewBox="0 0 12 8" aria-hidden="true"><path d="M1 1l5 5 5-5"/></svg>
         </button>
         <div class="nav-dropdown" id="navDropdown" role="menu" hidden>
@@ -590,7 +622,7 @@
     document.getElementById('navLogoutBtn').addEventListener('click', async () => {
       closeDropdown();
       try {
-        await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
+        await secureFetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
       } catch (_) { /* 네트워크 오류여도 화면은 로그아웃 상태로 표시 */ }
       renderLoggedOut();
     });
