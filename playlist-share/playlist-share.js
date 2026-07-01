@@ -204,19 +204,11 @@
     if (!currentPlaylist) return;
     detailCover.src = currentPlaylist.coverUrl;
     detailTitle.textContent = currentPlaylist.title;
-    detailByline.textContent = `by ${currentPlaylist.displayName || 'MusicPlz'} · ${currentPlaylist.tracks.length} tracks`;
-    renderActionButton(likeBtn, {
-      active: currentPlaylist.liked,
-      label: '좋아요',
-      count: currentPlaylist.likeCount || 0,
-      icon: currentPlaylist.liked ? '♥' : '♡',
-    });
-    renderActionButton(saveBtn, {
-      active: currentPlaylist.saved,
-      label: '저장',
-      count: currentPlaylist.saveCount || 0,
-      icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.75A2.75 2.75 0 0 1 9.75 2h4.5A2.75 2.75 0 0 1 17 4.75v16.1l-5-3.04-5 3.04V4.75Z"/></svg>',
-    });
+    detailByline.textContent = `by ${currentPlaylist.displayName || 'MusicPlz'} · ${currentPlaylist.tracks.length} tracks · ♥ ${currentPlaylist.likeCount || 0}`;
+    likeBtn.classList.toggle('is-on', currentPlaylist.liked);
+    saveBtn.classList.toggle('is-on', currentPlaylist.saved);
+    likeBtn.textContent = currentPlaylist.liked ? '좋아요 취소' : '좋아요';
+    saveBtn.textContent = currentPlaylist.saved ? '저장 취소' : '저장';
 
     detailTrackList.innerHTML = '';
     currentPlaylist.tracks.forEach((track, i) => {
@@ -232,13 +224,6 @@
       `;
       detailTrackList.appendChild(item);
     });
-  }
-
-  function renderActionButton(button, { active, label, count, icon }) {
-    button.classList.toggle('is-on', active);
-    button.setAttribute('aria-pressed', active ? 'true' : 'false');
-    button.setAttribute('aria-label', `${label} ${active ? '취소' : '하기'}`);
-    button.innerHTML = `<span class="action-icon">${icon}</span><span>${label}</span><strong>${count}</strong>`;
   }
 
   async function toggleAction(type) {
