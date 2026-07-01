@@ -956,7 +956,7 @@
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || '플레이리스트를 저장하지 못했어요.');
-      location.href = `/playlist-share/playlist-share.html?id=${encodeURIComponent(data.playlist.id)}`;
+      playWaveExit(`/playlist-share/playlist-share.html?id=${encodeURIComponent(data.playlist.id)}`);
     } catch (err) {
       playlistTitleError.textContent = err.message;
       playlistSaveBtn.disabled = false;

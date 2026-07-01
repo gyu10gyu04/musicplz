@@ -43,21 +43,23 @@
     <section class="playlist-grid" id="playlistGrid"></section>
     <section class="empty-state" id="emptyState" hidden>아직 보여줄 플레이리스트가 없습니다.</section>
 
-    <section class="playlist-detail" id="playlistDetail" hidden>
-      <button type="button" class="back-btn" id="backToList">← 목록으로</button>
-      <div class="detail-head">
-        <img id="detailCover" alt="" class="detail-cover">
-        <div class="detail-meta">
-          <p class="tagline">Shared Playlist</p>
-          <h2 id="detailTitle"></h2>
-          <p id="detailByline"></p>
-          <div class="detail-actions">
-            <button type="button" id="likeBtn">좋아요</button>
-            <button type="button" id="saveBtn">저장</button>
+    <section class="playlist-detail-backdrop" id="playlistDetail" hidden>
+      <div class="playlist-detail-card" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+        <button type="button" class="back-btn" id="backToList" aria-label="상세 닫기">×</button>
+        <div class="detail-head">
+          <img id="detailCover" alt="" class="detail-cover">
+          <div class="detail-meta">
+            <p class="tagline">Shared Playlist</p>
+            <h2 id="detailTitle"></h2>
+            <p id="detailByline"></p>
+            <div class="detail-actions">
+              <button type="button" id="likeBtn"></button>
+              <button type="button" id="saveBtn"></button>
+            </div>
           </div>
         </div>
+        <div class="detail-track-list" id="detailTrackList"></div>
       </div>
-      <div class="detail-track-list" id="detailTrackList"></div>
     </section>
   </main>
 

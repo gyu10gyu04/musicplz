@@ -33,6 +33,7 @@
   let currentPlaylist = null;
   let quickPlaylist = null;
   let replyToCommentId = null;
+  let waveCovered = false;
   const savedOnly = new URLSearchParams(location.search).get('saved') === '1';
 
   const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
@@ -49,16 +50,41 @@
     wavePath.setAttribute('d', `M0,100 L0,${topY} C25,${midY} 75,${midY} 100,${topY} L100,100 Z`);
   }
 
+  function playWaveIntro() {
+    waveEl.style.pointerEvents = 'auto';
+    setWave(1);
+    waveCovered = true;
+    let start = null;
+    const DURATION = 520;
+    function step(ts) {
+      if (start === null) start = ts;
+      const p = clamp((ts - start) / DURATION, 0, 1);
+      setWave(1 - p);
+      if (p < 1) {
+        requestAnimationFrame(step);
+      } else {
+        waveEl.style.pointerEvents = 'none';
+        waveCovered = false;
+      }
+    }
+    requestAnimationFrame(step);
+  }
+
   function playWaveTransition(toUrl) {
     waveEl.style.pointerEvents = 'auto';
+    waveCovered = true;
     let start = null;
     const DURATION = 620;
     function step(ts) {
       if (start === null) start = ts;
       const p = clamp((ts - start) / DURATION, 0, 1);
       setWave(p);
-      if (p < 1) requestAnimationFrame(step);
-      else location.href = toUrl;
+      if (p < 1) {
+        requestAnimationFrame(step);
+      } else {
+        sessionStorage.setItem('mp-transition', '1');
+        location.href = toUrl;
+      }
     }
     requestAnimationFrame(step);
   }
@@ -169,18 +195,28 @@
     if (!res.ok) return alert(data.error || '플레이리스트를 불러오지 못했어요.');
 
     currentPlaylist = data.playlist;
-    listToolbar.hidden = true;
-    playlistGrid.hidden = true;
-    emptyState.hidden = true;
     playlistDetail.hidden = false;
+    renderDetail();
+    requestAnimationFrame(() => playlistDetail.classList.add('is-open'));
+  }
 
+  function renderDetail() {
+    if (!currentPlaylist) return;
     detailCover.src = currentPlaylist.coverUrl;
     detailTitle.textContent = currentPlaylist.title;
-    detailByline.textContent = `by ${currentPlaylist.displayName || 'MusicPlz'} · ${currentPlaylist.tracks.length} tracks · ♥ ${currentPlaylist.likeCount || 0}`;
-    likeBtn.classList.toggle('is-on', currentPlaylist.liked);
-    saveBtn.classList.toggle('is-on', currentPlaylist.saved);
-    likeBtn.textContent = currentPlaylist.liked ? '좋아요 취소' : '좋아요';
-    saveBtn.textContent = currentPlaylist.saved ? '저장 취소' : '저장';
+    detailByline.textContent = `by ${currentPlaylist.displayName || 'MusicPlz'} · ${currentPlaylist.tracks.length} tracks`;
+    renderActionButton(likeBtn, {
+      active: currentPlaylist.liked,
+      label: '좋아요',
+      count: currentPlaylist.likeCount || 0,
+      icon: currentPlaylist.liked ? '♥' : '♡',
+    });
+    renderActionButton(saveBtn, {
+      active: currentPlaylist.saved,
+      label: '저장',
+      count: currentPlaylist.saveCount || 0,
+      icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.75A2.75 2.75 0 0 1 9.75 2h4.5A2.75 2.75 0 0 1 17 4.75v16.1l-5-3.04-5 3.04V4.75Z"/></svg>',
+    });
 
     detailTrackList.innerHTML = '';
     currentPlaylist.tracks.forEach((track, i) => {
@@ -198,6 +234,13 @@
     });
   }
 
+  function renderActionButton(button, { active, label, count, icon }) {
+    button.classList.toggle('is-on', active);
+    button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    button.setAttribute('aria-label', `${label} ${active ? '취소' : '하기'}`);
+    button.innerHTML = `<span class="action-icon">${icon}</span><span>${label}</span><strong>${count}</strong>`;
+  }
+
   async function toggleAction(type) {
     if (!currentPlaylist) return;
     const res = await fetch(`/api/playlists/${currentPlaylist.id}/${type}`, {
@@ -207,7 +250,8 @@
     const data = await res.json().catch(() => ({}));
     if (!res.ok) return alert(data.error || '로그인이 필요합니다.');
     currentPlaylist = data.playlist;
-    showDetail(currentPlaylist.id);
+    renderDetail();
+    loadList();
   }
 
   async function deleteCurrentQuickPlaylist() {
@@ -333,11 +377,13 @@
   }
 
   function showList() {
-    currentPlaylist = null;
-    listToolbar.hidden = false;
-    playlistGrid.hidden = false;
-    playlistDetail.hidden = true;
-    loadList();
+    playlistDetail.classList.remove('is-open');
+    setTimeout(() => {
+      if (!playlistDetail.classList.contains('is-open')) {
+        playlistDetail.hidden = true;
+        currentPlaylist = null;
+      }
+    }, 200);
   }
 
   function escapeHtml(value) {
@@ -358,6 +404,9 @@
     });
   });
   backToList.addEventListener('click', showList);
+  playlistDetail.addEventListener('click', e => {
+    if (e.target === playlistDetail) showList();
+  });
   likeBtn.addEventListener('click', () => toggleAction('like'));
   saveBtn.addEventListener('click', () => toggleAction('save'));
   quickCardClose.addEventListener('click', closeQuickCard);
@@ -377,6 +426,29 @@
   navCreate.addEventListener('click', e => {
     e.preventDefault();
     playWaveTransition(navCreate.getAttribute('href'));
+  });
+
+  document.querySelector('.logo').addEventListener('click', e => {
+    e.preventDefault();
+    playWaveTransition(e.currentTarget.getAttribute('href'));
+  });
+
+  window.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !playlistDetail.hidden) showList();
+  });
+
+  if (sessionStorage.getItem('mp-transition') === '1') {
+    sessionStorage.removeItem('mp-transition');
+    playWaveIntro();
+  } else {
+    setWave(0);
+    waveCovered = false;
+  }
+
+  window.addEventListener('pageshow', e => {
+    if (e.persisted && waveCovered) {
+      playWaveIntro();
+    }
   });
 
   const id = new URLSearchParams(location.search).get('id');

@@ -62,6 +62,10 @@
     return `../playlist-share/playlist-share.html?id=${encodeURIComponent(id)}`;
   }
 
+  function playlistListUrl() {
+    return '../playlist-share/playlist-share.html';
+  }
+
   /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
      카드 스프레드 시스템
      섹션 2가 화면에 들어오면서 카드 덱이 펼쳐짐
@@ -180,7 +184,7 @@
         if (title) title.textContent = playlist.title;
         if (user) user.textContent = `by @${playlist.displayName || 'MusicPlz'}`;
         if (likes) likes.innerHTML = `<span class="heart">♥</span> ${formatCompactNumber(playlist.likeCount)}`;
-        card.addEventListener('click', () => { location.href = playlistUrl(playlist.id); });
+        card.addEventListener('click', () => { playWaveTransition(playlistUrl(playlist.id)); });
       });
 
       if (trendingCard) {
@@ -198,7 +202,7 @@
             </div>
             <span class="t-likes">${formatCompactNumber(playlist.likeCount)}♥</span>
           `;
-          item.addEventListener('click', () => { location.href = playlistUrl(playlist.id); });
+          item.addEventListener('click', () => { playWaveTransition(playlistUrl(playlist.id)); });
           trendingCard.appendChild(item);
         });
       }
@@ -436,6 +440,7 @@
       if (p < 1) {
         requestAnimationFrame(step);
       } else {
+        sessionStorage.setItem('mp-transition', '1');
         location.href = toUrl;
       }
     }
@@ -455,6 +460,11 @@
       }
       playWaveTransition(url);
     });
+  });
+
+  document.querySelector('.see-all')?.addEventListener('click', e => {
+    e.preventDefault();
+    playWaveTransition(playlistListUrl());
   });
 
   /* 다른 페이지에서 돌아왔을 때(웨이브가 화면을 덮은 채로 진입) 자연스럽게 사라지는 인트로 처리 */
@@ -568,7 +578,10 @@
     dropdown.querySelectorAll('[data-action]').forEach(item => {
       item.addEventListener('click', e => {
         closeDropdown();
-        if (item.dataset.action !== 'library') {
+        if (item.dataset.action === 'library') {
+          e.preventDefault();
+          playWaveTransition(item.getAttribute('href'));
+        } else {
           e.preventDefault();
         }
       });
