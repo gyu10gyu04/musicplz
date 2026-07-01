@@ -116,7 +116,7 @@
     card.type = 'button';
     card.className = 'share-card';
     card.innerHTML = `
-      <img src="${playlist.coverUrl}" alt="" loading="lazy">
+      <img src="${escapeHtml(playlist.coverUrl)}" alt="" loading="lazy">
       <div class="share-card-body">
         <div class="share-card-title">${escapeHtml(playlist.title)}</div>
         <div class="share-card-meta">by ${escapeHtml(playlist.displayName || 'MusicPlz')} · ${playlist.trackCount || 0} tracks</div>
@@ -216,7 +216,7 @@
       item.className = 'detail-track';
       item.innerHTML = `
         <div class="detail-track-index">${i + 1}</div>
-        <img src="${track.coverUrl || currentPlaylist.coverUrl}" alt="" loading="lazy">
+        <img src="${escapeHtml(track.coverUrl || currentPlaylist.coverUrl)}" alt="" loading="lazy">
         <div class="detail-track-info">
           <div class="detail-track-title">${escapeHtml(track.title)}</div>
           <div class="detail-track-artist">${escapeHtml(track.artist)}</div>

@@ -177,7 +177,7 @@
         if (cover) {
           cover.classList.remove('cover-1', 'cover-2', 'cover-3');
           cover.innerHTML = playlist.coverUrl
-            ? `<img src="${playlist.coverUrl}" alt="" loading="lazy" draggable="false">`
+            ? `<img src="${escapeHtml(playlist.coverUrl)}" alt="" loading="lazy" draggable="false">`
             : '🎧';
         }
         if (badge) badge.textContent = `${playlist.trackCount || 0} TRACKS`;

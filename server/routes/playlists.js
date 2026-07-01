@@ -22,6 +22,19 @@ function requireLogin(req, res, next) {
   next();
 }
 
+function isSafeImageUrl(value) {
+  const url = String(value || '').trim();
+  if (!url || /[\u0000-\u001f\u007f<>"'`\s]/.test(url)) return false;
+  if (/^data:image\/(?:png|jpe?g|webp);base64,[a-z0-9+/=]+$/i.test(url)) return true;
+
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
 router.get('/', async (req, res, next) => {
   try {
     const query = String(req.query.q || '').trim().slice(0, 80);
@@ -45,6 +58,7 @@ router.post('/', requireLogin, async (req, res, next) => {
 
     if (!title) return res.status(400).json({ error: '플레이리스트 제목을 입력해주세요.' });
     if (!coverUrl) return res.status(400).json({ error: '플레이리스트 대표 커버를 선택해주세요.' });
+    if (!isSafeImageUrl(coverUrl)) return res.status(400).json({ error: '올바르지 않은 커버 이미지입니다.' });
     if (tracks.length === 0) return res.status(400).json({ error: '곡을 1개 이상 담아주세요.' });
 
     const safeTracks = tracks.map(track => ({
@@ -55,6 +69,10 @@ router.post('/', requireLogin, async (req, res, next) => {
       coverUrl: String(track.coverUrl || '').trim().slice(0, 1000),
       durationMs: Number.isFinite(Number(track.durationMs)) ? Number(track.durationMs) : null,
     })).filter(track => track.id && track.title && track.artist);
+
+    if (safeTracks.some(track => track.coverUrl && !isSafeImageUrl(track.coverUrl))) {
+      return res.status(400).json({ error: '올바르지 않은 곡 커버 이미지가 포함되어 있습니다.' });
+    }
 
     if (safeTracks.length === 0) return res.status(400).json({ error: '저장할 수 있는 곡이 없습니다.' });
 
