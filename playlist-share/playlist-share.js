@@ -34,6 +34,9 @@
   let quickPlaylist = null;
   let replyToCommentId = null;
   let waveCovered = false;
+  let detailRequestId = 0;
+  const detailCache = new Map();
+  const detailFetches = new Map();
   const savedOnly = new URLSearchParams(location.search).get('saved') === '1';
 
   const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
@@ -139,6 +142,7 @@
     emptyState.hidden = playlists.length > 0;
     emptyState.textContent = savedOnly ? '저장한 플레이리스트가 없습니다.' : '아직 보여줄 플레이리스트가 없습니다.';
     playlists.forEach(playlist => playlistGrid.appendChild(renderCard(playlist)));
+    playlists.slice(0, 6).forEach(playlist => prefetchDetail(playlist.id));
   }
 
   function renderCard(playlist) {
@@ -190,11 +194,36 @@
     card.addEventListener('pointerup', () => {
       const wasLongPressed = longPressed;
       clear();
-      if (!wasLongPressed) showDetail(playlist.id);
+      if (!wasLongPressed) showDetail(playlist.id, playlist);
     });
 
+    card.addEventListener('pointerenter', () => prefetchDetail(playlist.id));
+    card.addEventListener('focus', () => prefetchDetail(playlist.id));
+    card.addEventListener('pointerdown', () => prefetchDetail(playlist.id));
     card.addEventListener('pointercancel', clear);
     card.addEventListener('contextmenu', e => e.preventDefault());
+  }
+
+  async function fetchDetail(id) {
+    const key = String(id);
+    if (detailCache.has(key)) return detailCache.get(key);
+    if (detailFetches.has(key)) return detailFetches.get(key);
+
+    const request = fetch(`/api/playlists/${encodeURIComponent(id)}`, { credentials: 'same-origin' })
+      .then(async res => {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || '플레이리스트를 불러오지 못했어요.');
+        detailCache.set(key, data.playlist);
+        return data.playlist;
+      })
+      .finally(() => detailFetches.delete(key));
+
+    detailFetches.set(key, request);
+    return request;
+  }
+
+  function prefetchDetail(id) {
+    fetchDetail(id).catch(() => {});
   }
 
   function openQuickCard(playlist) {
@@ -219,29 +248,43 @@
     }, 180);
   }
 
-  async function showDetail(id) {
-    const res = await fetch(`/api/playlists/${encodeURIComponent(id)}`, { credentials: 'same-origin' });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) return alert(data.error || '플레이리스트를 불러오지 못했어요.');
-
-    currentPlaylist = data.playlist;
+  async function showDetail(id, summaryPlaylist = null) {
+    const requestId = ++detailRequestId;
+    const cached = detailCache.get(String(id));
+    currentPlaylist = cached || (summaryPlaylist ? { ...summaryPlaylist, tracks: null, isLoading: true } : null);
     playlistDetail.hidden = false;
-    renderDetail();
+    if (currentPlaylist) renderDetail();
     requestAnimationFrame(() => playlistDetail.classList.add('is-open'));
+
+    try {
+      const playlist = await fetchDetail(id);
+      if (requestId !== detailRequestId) return;
+      currentPlaylist = playlist;
+      renderDetail();
+    } catch (err) {
+      if (requestId === detailRequestId) alert(err.message || '플레이리스트를 불러오지 못했어요.');
+    }
   }
 
   function renderDetail() {
     if (!currentPlaylist) return;
+    const tracks = Array.isArray(currentPlaylist.tracks) ? currentPlaylist.tracks : [];
+    const trackCount = currentPlaylist.trackCount ?? tracks.length;
     detailCover.src = currentPlaylist.coverUrl;
     detailTitle.textContent = currentPlaylist.title;
-    detailByline.textContent = `by ${currentPlaylist.displayName || 'MusicPlz'} · ${currentPlaylist.tracks.length} tracks · ♥ ${currentPlaylist.likeCount || 0}`;
+    detailByline.textContent = `by ${currentPlaylist.displayName || 'MusicPlz'} · ${trackCount} tracks · ♥ ${currentPlaylist.likeCount || 0}`;
     likeBtn.classList.toggle('is-on', currentPlaylist.liked);
     saveBtn.classList.toggle('is-on', currentPlaylist.saved);
     likeBtn.textContent = currentPlaylist.liked ? '좋아요 취소' : '좋아요';
     saveBtn.textContent = currentPlaylist.saved ? '저장 취소' : '저장';
 
     detailTrackList.innerHTML = '';
-    currentPlaylist.tracks.forEach((track, i) => {
+    if (currentPlaylist.isLoading) {
+      detailTrackList.innerHTML = '<div class="detail-track detail-track-loading">곡 목록을 불러오는 중...</div>';
+      return;
+    }
+
+    tracks.forEach((track, i) => {
       const item = document.createElement('div');
       item.className = 'detail-track';
       item.innerHTML = `
@@ -265,6 +308,7 @@
     const data = await res.json().catch(() => ({}));
     if (!res.ok) return alert(data.error || '로그인이 필요합니다.');
     currentPlaylist = data.playlist;
+    detailCache.set(String(currentPlaylist.id), currentPlaylist);
     renderDetail();
     loadList();
   }
@@ -392,6 +436,7 @@
   }
 
   function showList() {
+    detailRequestId += 1;
     playlistDetail.classList.remove('is-open');
     setTimeout(() => {
       if (!playlistDetail.classList.contains('is-open')) {
