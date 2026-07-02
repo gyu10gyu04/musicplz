@@ -14,7 +14,14 @@ const {
   commentBelongsToPlaylist,
   playlistExists,
   commentExists,
+  recentPlaylistCount,
+  recentCommentCount,
 } = require('../models/playlists');
+
+const MAX_COVER_URL_LENGTH = 350_000;
+const MAX_TRACKS_PER_PLAYLIST = 50;
+const MAX_RECENT_PLAYLISTS = 5;
+const MAX_RECENT_COMMENTS = 20;
 
 const router = express.Router();
 
@@ -36,7 +43,7 @@ function parsePositiveInt(value) {
 
 function isSafeImageUrl(value) {
   const url = String(value || '').trim();
-  if (!url || url.length > 2_000_000 || /[\u0000-\u001f\u007f<>"'`\s]/.test(url)) return false;
+  if (!url || url.length > MAX_COVER_URL_LENGTH || /[\u0000-\u001f\u007f<>"'`\s]/.test(url)) return false;
   if (/^data:image\/(?:png|jpe?g|webp);base64,[a-z0-9+/=]+$/i.test(url)) return true;
 
   try {
@@ -65,13 +72,16 @@ router.get('/', async (req, res, next) => {
 router.post('/', requireLogin, async (req, res, next) => {
   try {
     const title = cleanText(req.body?.title, 40);
-    const coverUrl = String(req.body?.coverUrl || '').trim().slice(0, 2_000_000);
-    const tracks = Array.isArray(req.body?.tracks) ? req.body.tracks.slice(0, 100) : [];
+    const coverUrl = String(req.body?.coverUrl || '').trim().slice(0, MAX_COVER_URL_LENGTH + 1);
+    const tracks = Array.isArray(req.body?.tracks) ? req.body.tracks.slice(0, MAX_TRACKS_PER_PLAYLIST) : [];
 
     if (!title) return res.status(400).json({ error: '플레이리스트 제목을 입력해주세요.' });
     if (!coverUrl) return res.status(400).json({ error: '플레이리스트 대표 커버를 선택해주세요.' });
     if (!isSafeImageUrl(coverUrl)) return res.status(400).json({ error: '올바르지 않은 커버 이미지입니다.' });
     if (tracks.length === 0) return res.status(400).json({ error: '곡을 1개 이상 담아주세요.' });
+    if (await recentPlaylistCount(req.session.userId, 10) >= MAX_RECENT_PLAYLISTS) {
+      return res.status(429).json({ error: '플레이리스트를 너무 빠르게 만들고 있어요. 잠시 후 다시 시도해주세요.' });
+    }
 
     const safeTracks = tracks.map(track => ({
       id: cleanText(track.id, 120),
@@ -173,6 +183,9 @@ router.post('/:playlistId/comments', requireLogin, async (req, res, next) => {
     const content = cleanText(req.body?.content, 500);
     const parentCommentId = req.body?.parentCommentId ? parsePositiveInt(req.body.parentCommentId) : null;
     if (!content) return res.status(400).json({ error: '댓글 내용을 입력해주세요.' });
+    if (await recentCommentCount(req.session.userId, 10) >= MAX_RECENT_COMMENTS) {
+      return res.status(429).json({ error: '댓글을 너무 빠르게 작성하고 있어요. 잠시 후 다시 시도해주세요.' });
+    }
     if (req.body?.parentCommentId && !parentCommentId) return res.status(400).json({ error: '올바르지 않은 답글입니다.' });
     if (parentCommentId && !(await commentBelongsToPlaylist({ commentId: parentCommentId, playlistId }))) {
       return res.status(400).json({ error: '올바르지 않은 답글입니다.' });

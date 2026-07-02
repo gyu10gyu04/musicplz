@@ -105,8 +105,13 @@ async function initSchema() {
     );
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS playlists_created_at_idx ON playlists (created_at DESC);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS playlists_user_created_at_idx ON playlists (user_id, created_at DESC);`);
   await pool.query(`CREATE INDEX IF NOT EXISTS playlist_tracks_playlist_id_idx ON playlist_tracks (playlist_id, position);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS playlist_likes_playlist_id_idx ON playlist_likes (playlist_id);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS playlist_saves_playlist_id_idx ON playlist_saves (playlist_id);`);
   await pool.query(`CREATE INDEX IF NOT EXISTS playlist_comments_playlist_id_idx ON playlist_comments (playlist_id, created_at);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS playlist_comments_user_created_at_idx ON playlist_comments (user_id, created_at DESC);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS playlist_comment_likes_comment_id_idx ON playlist_comment_likes (comment_id);`);
   // express-session용 세션 테이블(session)은 connect-pg-simple이 자동으로 생성합니다.
 }
 

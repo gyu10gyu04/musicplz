@@ -751,16 +751,7 @@
     playlistCoverEmpty.hidden = true;
   }
 
-  function readFileAsDataUrl(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result || ''));
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  }
-
-  function compressImageFile(file, { maxSize = 900, quality = 0.82 } = {}) {
+  function compressImageFile(file, { maxSize = 640, quality = 0.72 } = {}) {
     return new Promise((resolve, reject) => {
       const objectUrl = URL.createObjectURL(file);
       const img = new Image();
@@ -907,7 +898,7 @@
 
     try {
       const dataUrl = await compressImageFile(file);
-      if (dataUrl.length > 1_900_000) {
+      if (dataUrl.length > 330_000) {
         playlistTitleError.textContent = '커버 이미지가 너무 큽니다. 더 작은 사진을 선택해주세요.';
         playlistCoverObjectUrl = null;
         return;

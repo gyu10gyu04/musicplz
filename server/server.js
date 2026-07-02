@@ -167,7 +167,7 @@ app.use((req, res, next) => {
 });
 
 /* ─── 바디 파서 ─── */
-app.use(express.json({ limit: '4mb' }));
+app.use(express.json({ limit: '1mb' }));
 
 app.use('/api', rateLimit({ windowMs: 60 * 1000, max: 120, keyPrefix: 'api' }));
 app.use('/api', sameOriginOnly);

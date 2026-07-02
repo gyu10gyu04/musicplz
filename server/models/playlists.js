@@ -2,6 +2,7 @@ const { pool } = require('../db');
 
 const SAFE_TEXT_RE = /[\u0000-\u001f\u007f]/g;
 const SAFE_IMAGE_FALLBACK = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
+const MAX_DATA_IMAGE_LENGTH = 350_000;
 
 function cleanText(value, maxLength = 500) {
   return String(value || '').replace(SAFE_TEXT_RE, '').trim().slice(0, maxLength);
@@ -9,7 +10,10 @@ function cleanText(value, maxLength = 500) {
 
 function safeImageUrl(value) {
   const url = String(value || '').trim();
-  if (/^data:image\/(?:png|jpe?g|webp);base64,[a-z0-9+/=]+$/i.test(url)) return url;
+  if (url.length > 1000 && !url.startsWith('data:image/')) return SAFE_IMAGE_FALLBACK;
+  if (/^data:image\/(?:png|jpe?g|webp);base64,[a-z0-9+/=]+$/i.test(url)) {
+    return url.length <= MAX_DATA_IMAGE_LENGTH ? url : SAFE_IMAGE_FALLBACK;
+  }
   if (/[\u0000-\u001f\u007f<>"'`\s]/.test(url)) return SAFE_IMAGE_FALLBACK;
 
   try {
@@ -84,32 +88,96 @@ async function listPlaylists({ query = '', sort = 'latest', userId = null, saved
   const userParam = `$${values.length}`;
   const where = whereParts.length ? `WHERE ${whereParts.join(' AND ')}` : '';
 
-  const orderBy = sort === 'popular'
-    ? 'like_count DESC, p.created_at DESC'
-    : 'p.created_at DESC';
+  if (sort !== 'popular') {
+    const { rows } = await pool.query(
+      `WITH base AS (
+        SELECT
+          p.id,
+          p.user_id,
+          p.title,
+          CASE
+            WHEN p.cover_url LIKE 'data:image/%' AND length(p.cover_url) > ${MAX_DATA_IMAGE_LENGTH} THEN NULL
+            ELSE p.cover_url
+          END AS cover_url,
+          p.created_at,
+          u.display_name
+        FROM playlists p
+        LEFT JOIN users u ON u.id = p.user_id
+        ${where}
+        ORDER BY p.created_at DESC
+        LIMIT 40
+      )
+      SELECT
+        base.id,
+        base.user_id,
+        base.title,
+        base.cover_url,
+        base.created_at,
+        base.display_name,
+        COALESCE(track_counts.track_count, 0)::int AS track_count,
+        COALESCE(like_counts.like_count, 0)::int AS like_count,
+        COALESCE(save_counts.save_count, 0)::int AS save_count,
+        EXISTS (SELECT 1 FROM playlist_likes liked_filter WHERE liked_filter.playlist_id = base.id AND liked_filter.user_id = ${userParam}) AS liked,
+        EXISTS (SELECT 1 FROM playlist_saves saved_filter WHERE saved_filter.playlist_id = base.id AND saved_filter.user_id = ${userParam}) AS saved
+      FROM base
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*)::int AS track_count
+        FROM playlist_tracks pt
+        WHERE pt.playlist_id = base.id
+      ) track_counts ON true
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*)::int AS like_count
+        FROM playlist_likes pl
+        WHERE pl.playlist_id = base.id
+      ) like_counts ON true
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*)::int AS save_count
+        FROM playlist_saves ps
+        WHERE ps.playlist_id = base.id
+      ) save_counts ON true
+      ORDER BY base.created_at DESC`,
+      values
+    );
+
+    return rows.map(row => publicPlaylistRow(row, userId));
+  }
 
   const { rows } = await pool.query(
-     `SELECT
-       p.id,
-       p.user_id,
-       p.title,
-       p.cover_url,
-       p.created_at,
-       u.display_name,
-       COUNT(DISTINCT pt.id)::int AS track_count,
-       COUNT(DISTINCT pl.user_id)::int AS like_count,
-       COUNT(DISTINCT ps.user_id)::int AS save_count,
-       BOOL_OR(pl.user_id = ${userParam}) AS liked,
-       BOOL_OR(ps.user_id = ${userParam}) AS saved
-     FROM playlists p
-     LEFT JOIN users u ON u.id = p.user_id
-     LEFT JOIN playlist_tracks pt ON pt.playlist_id = p.id
-     LEFT JOIN playlist_likes pl ON pl.playlist_id = p.id
-     LEFT JOIN playlist_saves ps ON ps.playlist_id = p.id
-     ${where}
-     GROUP BY p.id, u.display_name
-     ORDER BY ${orderBy}
-     LIMIT 80`,
+      `SELECT
+        p.id,
+        p.user_id,
+        p.title,
+        CASE
+          WHEN p.cover_url LIKE 'data:image/%' AND length(p.cover_url) > ${MAX_DATA_IMAGE_LENGTH} THEN NULL
+          ELSE p.cover_url
+        END AS cover_url,
+        p.created_at,
+        u.display_name,
+        COALESCE(track_counts.track_count, 0)::int AS track_count,
+        COALESCE(like_counts.like_count, 0)::int AS like_count,
+        COALESCE(save_counts.save_count, 0)::int AS save_count,
+        EXISTS (SELECT 1 FROM playlist_likes liked_filter WHERE liked_filter.playlist_id = p.id AND liked_filter.user_id = ${userParam}) AS liked,
+        EXISTS (SELECT 1 FROM playlist_saves saved_filter WHERE saved_filter.playlist_id = p.id AND saved_filter.user_id = ${userParam}) AS saved
+      FROM playlists p
+      LEFT JOIN users u ON u.id = p.user_id
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*)::int AS track_count
+        FROM playlist_tracks pt
+        WHERE pt.playlist_id = p.id
+      ) track_counts ON true
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*)::int AS like_count
+        FROM playlist_likes pl
+        WHERE pl.playlist_id = p.id
+      ) like_counts ON true
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*)::int AS save_count
+        FROM playlist_saves ps
+        WHERE ps.playlist_id = p.id
+      ) save_counts ON true
+      ${where}
+      ORDER BY like_count DESC, p.created_at DESC
+      LIMIT 40`,
     values
   );
 
@@ -118,23 +186,34 @@ async function listPlaylists({ query = '', sort = 'latest', userId = null, saved
 
 async function getPlaylistById({ playlistId, userId = null }) {
   const playlistResult = await pool.query(
-     `SELECT
+      `SELECT
        p.id,
        p.user_id,
        p.title,
-       p.cover_url,
-       p.created_at,
-       u.display_name,
-       COUNT(DISTINCT pl.user_id)::int AS like_count,
-       COUNT(DISTINCT ps.user_id)::int AS save_count,
-       BOOL_OR(pl.user_id = $2) AS liked,
-       BOOL_OR(ps.user_id = $2) AS saved
-      FROM playlists p
-      LEFT JOIN users u ON u.id = p.user_id
-     LEFT JOIN playlist_likes pl ON pl.playlist_id = p.id
-     LEFT JOIN playlist_saves ps ON ps.playlist_id = p.id
-     WHERE p.id = $1
-     GROUP BY p.id, u.display_name`,
+        CASE
+          WHEN p.cover_url LIKE 'data:image/%' AND length(p.cover_url) > ${MAX_DATA_IMAGE_LENGTH} THEN NULL
+          ELSE p.cover_url
+        END AS cover_url,
+        p.created_at,
+        u.display_name,
+        COALESCE(like_counts.like_count, 0)::int AS like_count,
+        COALESCE(save_counts.save_count, 0)::int AS save_count,
+        EXISTS (SELECT 1 FROM playlist_likes liked_filter WHERE liked_filter.playlist_id = p.id AND liked_filter.user_id = $2) AS liked,
+        EXISTS (SELECT 1 FROM playlist_saves saved_filter WHERE saved_filter.playlist_id = p.id AND saved_filter.user_id = $2) AS saved
+       FROM playlists p
+       LEFT JOIN users u ON u.id = p.user_id
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*)::int AS like_count
+        FROM playlist_likes pl
+        WHERE pl.playlist_id = p.id
+      ) like_counts ON true
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*)::int AS save_count
+        FROM playlist_saves ps
+        WHERE ps.playlist_id = p.id
+      ) save_counts ON true
+      WHERE p.id = $1
+      LIMIT 1`,
     [playlistId, userId]
   );
 
@@ -145,7 +224,8 @@ async function getPlaylistById({ playlistId, userId = null }) {
     `SELECT spotify_track_id, title, artist, album, cover_url, duration_ms, position
      FROM playlist_tracks
      WHERE playlist_id = $1
-     ORDER BY position ASC`,
+     ORDER BY position ASC
+     LIMIT 60`,
     [playlistId]
   );
 
@@ -174,6 +254,16 @@ async function commentBelongsToPlaylist({ commentId, playlistId }) {
 async function playlistExists(playlistId) {
   const { rows } = await pool.query(`SELECT 1 FROM playlists WHERE id = $1`, [playlistId]);
   return Boolean(rows[0]);
+}
+
+async function recentPlaylistCount(userId, minutes = 10) {
+  const { rows } = await pool.query(
+    `SELECT COUNT(*)::int AS count
+     FROM playlists
+     WHERE user_id = $1 AND created_at > now() - ($2::int * interval '1 minute')`,
+    [userId, minutes]
+  );
+  return rows[0]?.count || 0;
 }
 
 async function commentExists(commentId) {
@@ -225,27 +315,46 @@ async function deletePlaylist({ playlistId, userId }) {
 
 async function listComments({ playlistId, userId = null }) {
   const { rows } = await pool.query(
-    `SELECT
-       c.id,
-       c.playlist_id,
-       c.user_id,
-       c.parent_comment_id,
-       c.content,
-       c.created_at,
-       c.updated_at,
-       u.display_name,
-       COUNT(DISTINCT cl.user_id)::int AS like_count,
-       BOOL_OR(cl.user_id = $2) AS liked
-     FROM playlist_comments c
-     JOIN users u ON u.id = c.user_id
-     LEFT JOIN playlist_comment_likes cl ON cl.comment_id = c.id
-     WHERE c.playlist_id = $1
-     GROUP BY c.id, u.display_name
-     ORDER BY COALESCE(c.parent_comment_id, c.id), c.parent_comment_id NULLS FIRST, c.created_at ASC`,
+    `WITH base AS (
+       SELECT c.id, c.playlist_id, c.user_id, c.parent_comment_id, c.content, c.created_at, c.updated_at, u.display_name
+       FROM playlist_comments c
+       LEFT JOIN users u ON u.id = c.user_id
+       WHERE c.playlist_id = $1
+       ORDER BY c.created_at DESC
+       LIMIT 80
+     )
+     SELECT
+       base.id,
+       base.playlist_id,
+       base.user_id,
+       base.parent_comment_id,
+       base.content,
+       base.created_at,
+       base.updated_at,
+       base.display_name,
+       COALESCE(like_counts.like_count, 0)::int AS like_count,
+       EXISTS (SELECT 1 FROM playlist_comment_likes liked_filter WHERE liked_filter.comment_id = base.id AND liked_filter.user_id = $2) AS liked
+     FROM base
+     LEFT JOIN LATERAL (
+       SELECT COUNT(*)::int AS like_count
+       FROM playlist_comment_likes cl
+       WHERE cl.comment_id = base.id
+     ) like_counts ON true
+     ORDER BY COALESCE(base.parent_comment_id, base.id), base.parent_comment_id NULLS FIRST, base.created_at ASC`,
     [playlistId, userId]
   );
 
   return rows.map(row => publicCommentRow(row, userId));
+}
+
+async function recentCommentCount(userId, minutes = 10) {
+  const { rows } = await pool.query(
+    `SELECT COUNT(*)::int AS count
+     FROM playlist_comments
+     WHERE user_id = $1 AND created_at > now() - ($2::int * interval '1 minute')`,
+    [userId, minutes]
+  );
+  return rows[0]?.count || 0;
 }
 
 async function createComment({ playlistId, userId, parentCommentId = null, content }) {
@@ -343,4 +452,6 @@ module.exports = {
   commentBelongsToPlaylist,
   playlistExists,
   commentExists,
+  recentPlaylistCount,
+  recentCommentCount,
 };
