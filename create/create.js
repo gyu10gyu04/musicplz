@@ -9,11 +9,46 @@
 
   const waveEl   = document.getElementById('waveTransition');
   const wavePath = document.getElementById('wavePath');
+  const nav = document.querySelector('nav');
+  const NAV_SCROLL_THRESHOLD = 64;
 
   /* 이 페이지는 항상 "화면을 덮은 상태"로 시작해서 가라앉는 인트로를 재생한다.
      뒤로/앞으로가기로 bfcache에서 그대로 복원된 경우, 전환이 덮인 채로 멈춰 보일 수 있어
      떠날 때 덮인 상태였다면 다시 풀어주는 인트로를 재생해 복구한다. */
   let waveCovered = true;
+  let lastScrollY = window.scrollY;
+  let navScrollDelta = 0;
+  let navScrollRaf = null;
+
+  function syncNavVisibility() {
+    navScrollRaf = null;
+    const currentY = window.scrollY;
+    const delta = currentY - lastScrollY;
+
+    if (currentY <= 8) {
+      nav.classList.remove('is-hidden');
+      navScrollDelta = 0;
+      lastScrollY = currentY;
+      return;
+    }
+
+    navScrollDelta = Math.sign(navScrollDelta) === Math.sign(delta) ? navScrollDelta + delta : delta;
+    if (navScrollDelta > NAV_SCROLL_THRESHOLD) {
+      nav.classList.add('is-hidden');
+      navScrollDelta = 0;
+    } else if (navScrollDelta < -NAV_SCROLL_THRESHOLD) {
+      nav.classList.remove('is-hidden');
+      navScrollDelta = 0;
+    }
+    lastScrollY = currentY;
+  }
+
+  function scheduleNavVisibility() {
+    if (navScrollRaf) return;
+    navScrollRaf = requestAnimationFrame(syncNavVisibility);
+  }
+
+  window.addEventListener('scroll', scheduleNavVisibility, { passive: true });
 
   function setWave(p) {
     const e = easeInOutCubic(p);

@@ -33,7 +33,10 @@ nav{
   background:rgba(253,251,255,.72);
   backdrop-filter:blur(10px);
   border-bottom:1px solid rgba(0,0,0,.05);
+  transform:translateY(0);
+  transition:transform .24s ease;
 }
+nav.is-hidden{transform:translateY(-100%);}
 .logo{
   display:flex;align-items:center;
   text-decoration:none;cursor:pointer;

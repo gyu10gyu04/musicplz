@@ -45,8 +45,10 @@
   let pointerStackCreateHover = false;
   let emptySpacePress = null;
   let lastScrollY = window.scrollY;
+  let navScrollDelta = 0;
   let navScrollRaf = null;
   let pointerTracks = [];
+  const NAV_SCROLL_THRESHOLD = 64;
   const detailCache = new Map();
   const detailFetches = new Map();
   const savedOnly = new URLSearchParams(location.search).get('saved') === '1';
@@ -445,8 +447,23 @@
   function syncNavVisibility() {
     navScrollRaf = null;
     const currentY = window.scrollY;
-    const isScrollingDown = currentY > lastScrollY && currentY > 24;
-    nav.classList.toggle('is-hidden', isScrollingDown);
+    const delta = currentY - lastScrollY;
+
+    if (currentY <= 8) {
+      nav.classList.remove('is-hidden');
+      navScrollDelta = 0;
+      lastScrollY = currentY;
+      return;
+    }
+
+    navScrollDelta = Math.sign(navScrollDelta) === Math.sign(delta) ? navScrollDelta + delta : delta;
+    if (navScrollDelta > NAV_SCROLL_THRESHOLD) {
+      nav.classList.add('is-hidden');
+      navScrollDelta = 0;
+    } else if (navScrollDelta < -NAV_SCROLL_THRESHOLD) {
+      nav.classList.remove('is-hidden');
+      navScrollDelta = 0;
+    }
     lastScrollY = currentY;
   }
 

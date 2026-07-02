@@ -42,10 +42,7 @@ nav{
   z-index:1000;
   background:transparent;
   pointer-events:none;
-  transform:translateY(0);
-  transition:transform .34s cubic-bezier(.22,1,.36,1);
 }
-nav.is-hidden{transform:translateY(-110%);}
 nav .logo,nav .nav-links{pointer-events:auto;}
 .nav-links{display:flex;align-items:center;}
 .logo{

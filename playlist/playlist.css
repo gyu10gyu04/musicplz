@@ -77,3 +77,11 @@ nav{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-con
   .quick-meta{padding-right:18px;}
   .quick-meta h2{font-size:1.25rem;}
 }
+
+body{padding-top:79px;}
+nav{position:fixed;left:0;right:0;top:0;transform:translateY(0);transition:transform .24s ease;}
+nav.is-hidden{transform:translateY(-100%);}
+
+@media(max-width:680px){
+  body{padding-top:72px;}
+}

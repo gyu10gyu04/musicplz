@@ -10,11 +10,46 @@
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
   const waveEl   = document.getElementById('waveTransition');
   const wavePath = document.getElementById('wavePath');
+  const nav = document.querySelector('nav');
+  const NAV_SCROLL_THRESHOLD = 64;
 
   /* 현재 웨이브가 화면을 덮고 있는 상태인지 추적.
      이 페이지에 진입할 때 SVG 초기값 자체가 이미 화면 전체를
      덮은 상태이므로 true로 시작한다(아래 playWaveIntro가 곧바로 풀어줌). */
   let waveCovered = true;
+  let lastScrollY = window.scrollY;
+  let navScrollDelta = 0;
+  let navScrollRaf = null;
+
+  function syncNavVisibility() {
+    navScrollRaf = null;
+    const currentY = window.scrollY;
+    const delta = currentY - lastScrollY;
+
+    if (currentY <= 8) {
+      nav.classList.remove('is-hidden');
+      navScrollDelta = 0;
+      lastScrollY = currentY;
+      return;
+    }
+
+    navScrollDelta = Math.sign(navScrollDelta) === Math.sign(delta) ? navScrollDelta + delta : delta;
+    if (navScrollDelta > NAV_SCROLL_THRESHOLD) {
+      nav.classList.add('is-hidden');
+      navScrollDelta = 0;
+    } else if (navScrollDelta < -NAV_SCROLL_THRESHOLD) {
+      nav.classList.remove('is-hidden');
+      navScrollDelta = 0;
+    }
+    lastScrollY = currentY;
+  }
+
+  function scheduleNavVisibility() {
+    if (navScrollRaf) return;
+    navScrollRaf = requestAnimationFrame(syncNavVisibility);
+  }
+
+  window.addEventListener('scroll', scheduleNavVisibility, { passive: true });
 
   function setWave(p) {
     const e = easeInOutCubic(p);

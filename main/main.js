@@ -4,7 +4,6 @@
   const track       = document.getElementById('scrollTrack');
   const sections    = Array.from(track.children);
   const navLinks    = document.querySelectorAll('.nav-links a');
-  const nav          = document.querySelector('nav');
   const dots         = document.querySelectorAll('.s-dot');
   const scrollInd   = document.getElementById('scrollIndicator');
 
@@ -370,20 +369,13 @@
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
   function goTo(index) {
     const nextTarget = clamp(index, 0, sections.length - 1) * sW;
-    updateNavVisibility(nextTarget - target);
     target = nextTarget;
     needsRender = true;
-  }
-
-  function updateNavVisibility(delta) {
-    if (!nav || Math.abs(delta) < 1) return;
-    nav.classList.toggle('is-hidden', delta > 0);
   }
 
   function onWheel(e) {
     e.preventDefault();
     const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-    updateNavVisibility(delta);
     target = clamp(target + delta * WSENS, 0, maxScroll);
     needsRender = true;
   }
@@ -393,7 +385,6 @@
   function onTouchMove(e) {
     if (!touching) return;
     const nextTarget = clamp(tStartTarget - (e.touches[0].clientX - tStartX), 0, maxScroll);
-    updateNavVisibility(nextTarget - target);
     target = nextTarget;
     needsRender = true;
   }

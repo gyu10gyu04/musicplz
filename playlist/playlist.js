@@ -27,12 +27,17 @@
   const quickReplyState = document.getElementById('quickReplyState');
   const waveEl = document.getElementById('waveTransition');
   const wavePath = document.getElementById('wavePath');
+  const nav = document.querySelector('nav');
   const navCreate = document.querySelector('.nav-create');
 
   let sort = 'latest';
   let currentPlaylist = null;
   let quickPlaylist = null;
   let replyToCommentId = null;
+  let lastScrollY = window.scrollY;
+  let navScrollDelta = 0;
+  let navScrollRaf = null;
+  const NAV_SCROLL_THRESHOLD = 64;
   const savedOnly = new URLSearchParams(location.search).get('saved') === '1';
 
   const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
@@ -61,6 +66,34 @@
       else location.href = toUrl;
     }
     requestAnimationFrame(step);
+  }
+
+  function syncNavVisibility() {
+    navScrollRaf = null;
+    const currentY = window.scrollY;
+    const delta = currentY - lastScrollY;
+
+    if (currentY <= 8) {
+      nav.classList.remove('is-hidden');
+      navScrollDelta = 0;
+      lastScrollY = currentY;
+      return;
+    }
+
+    navScrollDelta = Math.sign(navScrollDelta) === Math.sign(delta) ? navScrollDelta + delta : delta;
+    if (navScrollDelta > NAV_SCROLL_THRESHOLD) {
+      nav.classList.add('is-hidden');
+      navScrollDelta = 0;
+    } else if (navScrollDelta < -NAV_SCROLL_THRESHOLD) {
+      nav.classList.remove('is-hidden');
+      navScrollDelta = 0;
+    }
+    lastScrollY = currentY;
+  }
+
+  function scheduleNavVisibility() {
+    if (navScrollRaf) return;
+    navScrollRaf = requestAnimationFrame(syncNavVisibility);
   }
 
   let csrfTokenPromise = null;
@@ -411,6 +444,7 @@
     e.preventDefault();
     playWaveTransition(navCreate.getAttribute('href'));
   });
+  window.addEventListener('scroll', scheduleNavVisibility, { passive: true });
 
   const id = new URLSearchParams(location.search).get('id');
   if (id) showDetail(id);
