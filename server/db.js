@@ -110,10 +110,14 @@ async function initSchema() {
       id         SERIAL PRIMARY KEY,
       user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       reason     TEXT NOT NULL,
+      display_reason TEXT NOT NULL DEFAULT '비정상적인 이용 패턴이 감지되었습니다.',
       metadata   JSONB NOT NULL DEFAULT '{}'::jsonb,
+      blocked_until TIMESTAMPTZ NOT NULL DEFAULT (now() + interval '1 day'),
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `);
+  await pool.query(`ALTER TABLE blocked_users ADD COLUMN IF NOT EXISTS display_reason TEXT NOT NULL DEFAULT '비정상적인 이용 패턴이 감지되었습니다.';`);
+  await pool.query(`ALTER TABLE blocked_users ADD COLUMN IF NOT EXISTS blocked_until TIMESTAMPTZ NOT NULL DEFAULT (now() + interval '1 day');`);
   await pool.query(`CREATE INDEX IF NOT EXISTS playlists_created_at_idx ON playlists (created_at DESC);`);
   await pool.query(`CREATE INDEX IF NOT EXISTS playlists_user_created_at_idx ON playlists (user_id, created_at DESC);`);
   await pool.query(`CREATE INDEX IF NOT EXISTS playlist_tracks_playlist_id_idx ON playlist_tracks (playlist_id, position);`);
@@ -123,6 +127,7 @@ async function initSchema() {
   await pool.query(`CREATE INDEX IF NOT EXISTS playlist_comments_user_created_at_idx ON playlist_comments (user_id, created_at DESC);`);
   await pool.query(`CREATE INDEX IF NOT EXISTS playlist_comment_likes_comment_id_idx ON playlist_comment_likes (comment_id);`);
   await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS blocked_users_user_id_unique_idx ON blocked_users (user_id);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS blocked_users_until_idx ON blocked_users (blocked_until);`);
   await pool.query(`CREATE INDEX IF NOT EXISTS blocked_users_created_at_idx ON blocked_users (created_at DESC);`);
   // express-session용 세션 테이블(session)은 connect-pg-simple이 자동으로 생성합니다.
 }

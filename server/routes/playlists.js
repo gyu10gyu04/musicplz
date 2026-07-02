@@ -27,6 +27,7 @@ const MAX_FRONTEND_COVER_URL_LENGTH = 330_000;
 const MAX_TRACKS_PER_PLAYLIST = 50;
 const MAX_RECENT_PLAYLISTS = 5;
 const MAX_RECENT_COMMENTS = 20;
+const HOUR_MS = 60 * 60 * 1000;
 const SPOTIFY_TRACK_ID_RE = /^[0-9A-Za-z]{22}$/;
 const DUMMY_TEXT_RE = /^(?:a+|ㅋ+|ㅎ+|ㅠ+|ㅜ+|ㅁ+|ㄴ+|ㅇ+|ㅁㄴㅇ+|asdf+|qwer+|test|dummy|null|undefined|none|n\/a|lorem\s*ipsum|123+|0+)$/i;
 
@@ -55,9 +56,12 @@ function safeEqual(a, b) {
 }
 
 async function blockPlaylistBypass(req, token) {
+  const blockedUntil = new Date(Date.now() + 24 * HOUR_MS);
   await blockUser({
     userId: req.session.userId,
     reason: 'playlist_create_bypass',
+    displayReason: '정상적인 플레이리스트 생성 절차를 우회한 요청이 감지되었습니다.',
+    blockedUntil,
     metadata: {
       ipAddress: req.ip,
       path: req.originalUrl,
@@ -69,9 +73,18 @@ async function blockPlaylistBypass(req, token) {
 }
 
 async function blockAbnormalPlaylist(req, { playlist, deleted, reasons, geminiResult, spotifyVerification }) {
+  const banDurationHours = Math.min(Math.max(Math.round(Number(geminiResult?.banDurationHours) || 24), 1), 720);
+  const blockedUntil = new Date(Date.now() + banDurationHours * HOUR_MS);
+  const displayReason = cleanText(
+    geminiResult?.displayReason || reasons[0] || '비정상적인 플레이리스트 생성이 감지되었습니다.',
+    200
+  );
+
   await blockUser({
     userId: req.session.userId,
     reason: 'playlist_safety_abnormal',
+    displayReason,
+    blockedUntil,
     metadata: {
       ipAddress: req.ip,
       playlistId: playlist.id,
@@ -79,6 +92,7 @@ async function blockAbnormalPlaylist(req, { playlist, deleted, reasons, geminiRe
       reasons,
       geminiResult,
       spotifyVerification,
+      banDurationHours,
       userAgent: req.get('user-agent') || '',
     },
   });
@@ -181,6 +195,8 @@ async function inspectPlaylistSafety({ title, coverUrl, tracks }) {
     reasons,
     geminiResult,
     spotifyVerification,
+    banDurationHours: Math.min(Math.max(Math.round(Number(geminiResult.banDurationHours) || 24), 1), 720),
+    displayReason: geminiResult.displayReason || reasons[0] || '비정상적인 플레이리스트 생성이 감지되었습니다.',
   };
 }
 
@@ -223,7 +239,7 @@ router.post('/', requireLogin, async (req, res, next) => {
     const createToken = String(req.body?.createToken || '');
     if (!req.session.playlistCreateToken || !createToken || !safeEqual(createToken, req.session.playlistCreateToken)) {
       await blockPlaylistBypass(req, createToken);
-      return res.status(403).json({ error: '정상적인 완료 절차를 거치지 않아 IP가 차단되었습니다.' });
+      return res.status(403).json({ error: '정상적인 완료 절차를 거치지 않아 계정이 일시 차단되었습니다.' });
     }
     delete req.session.playlistCreateToken;
 
@@ -271,7 +287,7 @@ router.post('/', requireLogin, async (req, res, next) => {
         geminiResult: safety.geminiResult,
         spotifyVerification: safety.spotifyVerification,
       });
-      return res.status(403).json({ error: '비정상적인 플레이리스트로 판단되어 삭제되었고 IP가 차단되었습니다.' });
+      return res.status(403).json({ error: '비정상적인 플레이리스트로 판단되어 삭제되었고 계정이 일시 차단되었습니다.' });
     }
 
     res.status(201).json({ playlist });

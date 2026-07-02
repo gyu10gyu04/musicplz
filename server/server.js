@@ -22,7 +22,7 @@ const authRoutes = require('./routes/auth');
 const musicRoutes = require('./routes/music');
 const playlistRoutes = require('./routes/playlists');
 const adminRoutes = require('./routes/admin');
-const { isUserBlocked } = require('./models/blockedUsers');
+const { getActiveBlockedUser } = require('./models/blockedUsers');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -161,6 +161,32 @@ function rejectNonJsonBody(req, res, next) {
   next();
 }
 
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function publicBlockDetails(block) {
+  return {
+    reason: block.displayReason || '비정상적인 이용 패턴이 감지되었습니다.',
+    blockedUntil: block.blockedUntil,
+  };
+}
+
+function blockedPage(block) {
+  const details = publicBlockDetails(block);
+  const blockedUntil = details.blockedUntil ? new Date(details.blockedUntil) : null;
+  const blockedUntilText = blockedUntil && !Number.isNaN(blockedUntil.getTime())
+    ? blockedUntil.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
+    : '차단 해제 시간이 확인되지 않습니다.';
+
+  return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>접속 차단</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#101014;color:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}.card{width:min(520px,calc(100% - 32px));padding:34px;border:1px solid rgba(255,255,255,.14);border-radius:24px;background:linear-gradient(145deg,rgba(255,255,255,.11),rgba(255,255,255,.04));box-shadow:0 24px 80px rgba(0,0,0,.35)}.eyebrow{color:#ff8f8f;font-weight:700;font-size:14px;letter-spacing:.08em}h1{margin:10px 0 14px;font-size:32px}p{line-height:1.65;color:#d8d8df}.box{margin-top:18px;padding:16px;border-radius:16px;background:rgba(255,255,255,.08)}strong{color:#fff}</style></head><body><main class="card"><div class="eyebrow">ACCESS BLOCKED</div><h1>접속이 차단되었습니다.</h1><p>MusicPlz에서 비정상적인 플레이리스트 생성 또는 이용 패턴이 감지되어 계정 이용이 일시 제한되었습니다.</p><div class="box"><p><strong>차단 사유</strong><br>${escapeHtml(details.reason)}</p><p><strong>해제 예정 시간</strong><br>${escapeHtml(blockedUntilText)} 이후 자동으로 다시 접속할 수 있습니다.</p></div><p>해제 시간이 지난 뒤 새로고침하면 정상적으로 이용할 수 있습니다.</p></main></body></html>`;
+}
+
 app.use((req, res, next) => {
   if (req.method === 'TRACE') {
     return res.status(403).json({ error: '허용되지 않은 요청 출처입니다.' });
@@ -201,13 +227,17 @@ app.use(session({
 
 app.use(async (req, res, next) => {
   try {
-    if (!(await isUserBlocked(req.session.userId || null))) return next();
+    const block = await getActiveBlockedUser(req.session.userId || null);
+    if (!block) return next();
 
     if (req.path.startsWith('/api/')) {
-      return res.status(403).json({ error: '차단된 사용자입니다. 사이트에 접속할 수 없습니다.' });
+      return res.status(403).json({
+        error: '차단된 사용자입니다. 사이트에 접속할 수 없습니다.',
+        block: publicBlockDetails(block),
+      });
     }
 
-    return res.status(403).type('html').send(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>접속 차단</title></head><body><h1>접속이 차단되었습니다.</h1><p>이 계정은 MusicPlz 이용이 제한되었습니다.</p></body></html>`);
+    return res.status(403).type('html').send(blockedPage(block));
   } catch (err) {
     next(err);
   }
