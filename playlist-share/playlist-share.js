@@ -310,14 +310,20 @@
   }
 
   function normalizedPointerTrack(track, fallbackCoverUrl = '') {
+    const id = String(track.id || '').trim();
     return {
-      id: String(track.id || '').trim(),
+      id,
       title: String(track.title || '').trim(),
       artist: String(track.artist || '').trim(),
       album: String(track.album || '').trim(),
       coverUrl: String(track.coverUrl || fallbackCoverUrl || '').trim(),
       durationMs: Number(track.durationMs) || null,
+      stackRotate: track.stackRotate || `${(((Array.from(id).reduce((sum, char) => sum + char.charCodeAt(0), 0) % 9) - 4) * .55).toFixed(2)}deg`,
     };
+  }
+
+  function pointerCardTitle(title) {
+    return title.length > 12 ? `${title.slice(0, 12)}~...` : title;
   }
 
   function ensurePointerStackEl() {
@@ -361,9 +367,15 @@
       const card = document.createElement('div');
       card.className = 'pointer-track-card';
       card.style.setProperty('--stack-i', i);
+      card.style.setProperty('--stack-z', i + 1);
+      card.style.setProperty('--stack-rotate', track.stackRotate || '0deg');
+      card.style.setProperty('--stack-rest-y', `${i * -1}px`);
+      card.style.setProperty('--stack-open-y', `${i * 54}px`);
+      card.style.setProperty('--stack-open-delay', `${i * 22}ms`);
+      card.style.setProperty('--stack-close-delay', `${(pointerTracks.length - 1 - i) * 18}ms`);
       card.innerHTML = `
         <img src="${escapeHtml(track.coverUrl)}" alt="" draggable="false">
-        <span>${escapeHtml(track.title)}</span>
+        <span>${escapeHtml(pointerCardTitle(track.title))}</span>
       `;
       fragment.appendChild(card);
     });
