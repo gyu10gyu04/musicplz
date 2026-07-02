@@ -21,6 +21,8 @@ const { pool, initSchema } = require('./db');
 const authRoutes = require('./routes/auth');
 const musicRoutes = require('./routes/music');
 const playlistRoutes = require('./routes/playlists');
+const adminRoutes = require('./routes/admin');
+const { isIpBlocked } = require('./models/blockedIps');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -65,6 +67,20 @@ app.use((req, res, next) => {
     res.setHeader('Strict-Transport-Security', 'max-age=15552000; includeSubDomains');
   }
   next();
+});
+
+app.use(async (req, res, next) => {
+  try {
+    if (!(await isIpBlocked(req.ip))) return next();
+
+    if (req.path.startsWith('/api/')) {
+      return res.status(403).json({ error: '차단된 IP입니다. 사이트에 접속할 수 없습니다.' });
+    }
+
+    return res.status(403).type('html').send(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>접속 차단</title></head><body><h1>접속이 차단되었습니다.</h1><p>이 IP는 MusicPlz 이용이 제한되었습니다.</p></body></html>`);
+  } catch (err) {
+    next(err);
+  }
 });
 
 /* ─── 간단한 인메모리 요청 제한 ───
@@ -210,6 +226,7 @@ app.use('/api', csrfProtection);
 app.use('/api/auth', authRoutes);
 app.use('/api/music', musicRoutes);
 app.use('/api/playlists', playlistRoutes);
+app.use('/api/admin', adminRoutes);
 
 /* ─── 정적 파일 서빙 ───
    프로젝트 폴더 구조(main/, login/, create/)를 그대로 서빙합니다.

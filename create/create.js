@@ -969,11 +969,22 @@
     playlistSaveBtn.textContent = '저장 중...';
 
     try {
+      const tokenRes = await secureFetch('/api/playlists/create-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({}),
+      });
+      const tokenData = await tokenRes.json().catch(() => ({}));
+      if (!tokenRes.ok || !tokenData.createToken) {
+        throw new Error(tokenData.error || '플레이리스트 생성 권한을 확인하지 못했어요.');
+      }
+
       const res = await secureFetch('/api/playlists', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
-        body: JSON.stringify({ title, coverUrl: playlistCoverValue, tracks }),
+        body: JSON.stringify({ title, coverUrl: playlistCoverValue, tracks, createToken: tokenData.createToken }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || '플레이리스트를 저장하지 못했어요.');

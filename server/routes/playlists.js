@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const express = require('express');
 const {
   createPlaylist,
@@ -17,11 +18,17 @@ const {
   recentPlaylistCount,
   recentCommentCount,
 } = require('../models/playlists');
+const { blockIp } = require('../models/blockedIps');
+const { analyzePlaylistSafety } = require('../services/gemini');
+const { verifyTrackIds } = require('../services/spotify');
 
 const MAX_COVER_URL_LENGTH = 350_000;
+const MAX_FRONTEND_COVER_URL_LENGTH = 330_000;
 const MAX_TRACKS_PER_PLAYLIST = 50;
 const MAX_RECENT_PLAYLISTS = 5;
 const MAX_RECENT_COMMENTS = 20;
+const SPOTIFY_TRACK_ID_RE = /^[0-9A-Za-z]{22}$/;
+const DUMMY_TEXT_RE = /^(?:a+|ㅋ+|ㅎ+|ㅠ+|ㅜ+|ㅁ+|ㄴ+|ㅇ+|ㅁㄴㅇ+|asdf+|qwer+|test|dummy|null|undefined|none|n\/a|lorem\s*ipsum|123+|0+)$/i;
 
 const router = express.Router();
 
@@ -39,6 +46,142 @@ function cleanText(value, maxLength) {
 function parsePositiveInt(value) {
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function safeEqual(a, b) {
+  const left = Buffer.from(String(a || ''));
+  const right = Buffer.from(String(b || ''));
+  return left.length === right.length && crypto.timingSafeEqual(left, right);
+}
+
+async function blockPlaylistBypass(req, token) {
+  await blockIp({
+    ipAddress: req.ip,
+    userId: req.session.userId || null,
+    reason: 'playlist_create_bypass',
+    metadata: {
+      path: req.originalUrl,
+      method: req.method,
+      userAgent: req.get('user-agent') || '',
+      tokenProvided: Boolean(token),
+    },
+  });
+}
+
+async function blockAbnormalPlaylist(req, { playlist, deleted, reasons, geminiResult, spotifyVerification }) {
+  await blockIp({
+    ipAddress: req.ip,
+    userId: req.session.userId || null,
+    reason: 'playlist_safety_abnormal',
+    metadata: {
+      playlistId: playlist.id,
+      deleted,
+      reasons,
+      geminiResult,
+      spotifyVerification,
+      userAgent: req.get('user-agent') || '',
+    },
+  });
+}
+
+function normalizedMusicText(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFKC')
+    .replace(/[\s\-_.,!?:;()[\]{}'"`~@#$%^&*+=|\\/]+/g, ' ')
+    .trim();
+}
+
+function isDummyText(value) {
+  const text = normalizedMusicText(value);
+  if (!text) return true;
+  if (/^[0-9]+$/.test(text)) return true;
+  if (DUMMY_TEXT_RE.test(text)) return true;
+  if (/^(.)\1{3,}$/.test(text.replace(/\s/g, ''))) return true;
+  return false;
+}
+
+async function inspectPlaylistSafety({ title, coverUrl, tracks }) {
+  const deterministicReasons = [];
+  const coverKind = coverUrl.startsWith('data:image/') ? 'data-image' : 'remote-url';
+
+  if (coverUrl.length > MAX_FRONTEND_COVER_URL_LENGTH) {
+    deterministicReasons.push(`커버 이미지 데이터가 프론트 기준 용량(${MAX_FRONTEND_COVER_URL_LENGTH}자)을 초과했습니다.`);
+  }
+
+  if (isDummyText(title)) {
+    deterministicReasons.push('플레이리스트 제목이 더미/쓰레기 값으로 보입니다.');
+  }
+
+  const invalidSpotifyIds = tracks
+    .map(track => track.id)
+    .filter(id => !SPOTIFY_TRACK_ID_RE.test(id));
+  if (invalidSpotifyIds.length > 0) {
+    deterministicReasons.push(`Spotify 트랙 ID 형식이 아닌 곡이 ${invalidSpotifyIds.length}개 포함되어 있습니다.`);
+  }
+
+  const dummyTracks = tracks.filter(track => isDummyText(track.title) || isDummyText(track.artist));
+  if (dummyTracks.length > 0) {
+    deterministicReasons.push(`곡 제목/아티스트가 더미/쓰레기 값인 곡이 ${dummyTracks.length}개 포함되어 있습니다.`);
+  }
+
+  const trackKeys = tracks.map(track => `${normalizedMusicText(track.title)}::${normalizedMusicText(track.artist)}`);
+  const uniqueTrackKeys = new Set(trackKeys);
+  if (tracks.length >= 5 && uniqueTrackKeys.size <= Math.ceil(tracks.length * 0.4)) {
+    deterministicReasons.push('동일하거나 거의 같은 곡 정보가 과도하게 반복되어 있습니다.');
+  }
+
+  let spotifyVerification = {
+    checked: 0,
+    found: 0,
+    missingIds: [],
+    skippedInvalidIds: invalidSpotifyIds,
+    error: null,
+  };
+  const validSpotifyIds = tracks
+    .map(track => track.id)
+    .filter(id => SPOTIFY_TRACK_ID_RE.test(id));
+  try {
+    spotifyVerification = {
+      ...(await verifyTrackIds(validSpotifyIds)),
+      skippedInvalidIds: invalidSpotifyIds,
+      error: null,
+    };
+    if (spotifyVerification.missingIds.length > 0) {
+      deterministicReasons.push(`Spotify API에서 찾을 수 없는 곡 ID가 ${spotifyVerification.missingIds.length}개 포함되어 있습니다.`);
+    }
+  } catch (err) {
+    spotifyVerification.error = err.message;
+    console.warn('[Spotify 플레이리스트 검증 실패]', err.message);
+  }
+
+  let geminiResult = { abnormal: false, confidence: 0, reasons: [], error: null };
+  try {
+    geminiResult = await analyzePlaylistSafety({
+      title,
+      coverLength: coverUrl.length,
+      coverKind,
+      deterministicReasons,
+      spotifyVerification,
+      tracks,
+    });
+  } catch (err) {
+    geminiResult.error = err.message;
+    console.warn('[Gemini 플레이리스트 안전성 분석 실패]', err.message);
+  }
+
+  const geminiAbnormal = Boolean(geminiResult.abnormal && geminiResult.confidence >= 0.75);
+  const reasons = [
+    ...deterministicReasons,
+    ...(geminiAbnormal ? geminiResult.reasons.map(reason => `Gemini: ${reason}`) : []),
+  ];
+
+  return {
+    abnormal: deterministicReasons.length > 0 || geminiAbnormal,
+    reasons,
+    geminiResult,
+    spotifyVerification,
+  };
 }
 
 function isSafeImageUrl(value) {
@@ -69,8 +212,21 @@ router.get('/', async (req, res, next) => {
   }
 });
 
+router.post('/create-token', requireLogin, (req, res) => {
+  const token = crypto.randomBytes(32).toString('base64url');
+  req.session.playlistCreateToken = token;
+  res.json({ createToken: token });
+});
+
 router.post('/', requireLogin, async (req, res, next) => {
   try {
+    const createToken = String(req.body?.createToken || '');
+    if (!req.session.playlistCreateToken || !createToken || !safeEqual(createToken, req.session.playlistCreateToken)) {
+      await blockPlaylistBypass(req, createToken);
+      return res.status(403).json({ error: '정상적인 완료 절차를 거치지 않아 IP가 차단되었습니다.' });
+    }
+    delete req.session.playlistCreateToken;
+
     const title = cleanText(req.body?.title, 40);
     const coverUrl = String(req.body?.coverUrl || '').trim().slice(0, MAX_COVER_URL_LENGTH + 1);
     const tracks = Array.isArray(req.body?.tracks) ? req.body.tracks.slice(0, MAX_TRACKS_PER_PLAYLIST) : [];
@@ -104,6 +260,19 @@ router.post('/', requireLogin, async (req, res, next) => {
       coverUrl,
       tracks: safeTracks,
     });
+
+    const safety = await inspectPlaylistSafety({ title, coverUrl, tracks: safeTracks });
+    if (safety.abnormal) {
+      const deleted = await deletePlaylist({ playlistId: playlist.id, userId: req.session.userId });
+      await blockAbnormalPlaylist(req, {
+        playlist,
+        deleted,
+        reasons: safety.reasons,
+        geminiResult: safety.geminiResult,
+        spotifyVerification: safety.spotifyVerification,
+      });
+      return res.status(403).json({ error: '비정상적인 플레이리스트로 판단되어 삭제되었고 IP가 차단되었습니다.' });
+    }
 
     res.status(201).json({ playlist });
   } catch (err) {

@@ -114,6 +114,34 @@ async function searchTracks(query, limit = 10) {
   }));
 }
 
+async function verifyTrackIds(trackIds) {
+  const ids = Array.isArray(trackIds)
+    ? [...new Set(trackIds.map(id => String(id || '').trim()).filter(Boolean))].slice(0, 50)
+    : [];
+
+  if (ids.length === 0) return { checked: 0, found: 0, missingIds: [] };
+
+  const token = await getAccessToken();
+  const url = `${SPOTIFY_API_BASE}/tracks?` + new URLSearchParams({
+    ids: ids.join(','),
+    market: MARKET,
+  });
+
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Spotify 트랙 검증 실패 (status ${res.status}): ${text}`);
+  }
+
+  const data = await res.json();
+  const foundIds = new Set((data.tracks || []).filter(Boolean).map(track => track.id));
+  return {
+    checked: ids.length,
+    found: foundIds.size,
+    missingIds: ids.filter(id => !foundIds.has(id)),
+  };
+}
+
 /**
  * 특정 앨범에 속한 트랙들을 가져옵니다.
  * 앨범 트랙 조회 엔드포인트는 트랙의 popularity(인기도)를 안 줘서,
@@ -366,4 +394,4 @@ function normalizeText(value) {
     .trim();
 }
 
-module.exports = { searchTracks, getAlbumTracks, getArtistAlbums, searchAlbumsByArtistAndNames };
+module.exports = { searchTracks, verifyTrackIds, getAlbumTracks, getArtistAlbums, searchAlbumsByArtistAndNames };

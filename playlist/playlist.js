@@ -173,16 +173,12 @@
 
   function openQuickCard(playlist) {
     quickPlaylist = playlist;
-    replyToCommentId = null;
     quickCover.src = playlist.coverUrl;
     quickTitle.textContent = playlist.title;
     quickOwner.textContent = `플리주인 @${playlist.displayName || 'MusicPlz'}`;
     quickStats.textContent = `${playlist.trackCount || 0} tracks · ♥ ${playlist.likeCount || 0} · 저장 ${playlist.saveCount || 0}`;
     quickOwnerActions.hidden = !playlist.isOwner;
-    quickCommentInput.value = '';
-    quickReplyState.hidden = true;
     quickCardBackdrop.hidden = false;
-    loadQuickComments();
     requestAnimationFrame(() => quickCardBackdrop.classList.add('is-open'));
   }
 
@@ -199,10 +195,14 @@
     if (!res.ok) return alert(data.error || '플레이리스트를 불러오지 못했어요.');
 
     currentPlaylist = data.playlist;
+    quickPlaylist = currentPlaylist;
+    replyToCommentId = null;
     listToolbar.hidden = true;
     playlistGrid.hidden = true;
     emptyState.hidden = true;
     playlistDetail.hidden = false;
+    quickCommentInput.value = '';
+    quickReplyState.hidden = true;
 
     detailCover.src = currentPlaylist.coverUrl;
     detailTitle.textContent = currentPlaylist.title;
@@ -226,6 +226,7 @@
       `;
       detailTrackList.appendChild(item);
     });
+    loadQuickComments();
   }
 
   async function toggleAction(type) {
@@ -364,6 +365,8 @@
 
   function showList() {
     currentPlaylist = null;
+    quickPlaylist = null;
+    replyToCommentId = null;
     listToolbar.hidden = false;
     playlistGrid.hidden = false;
     playlistDetail.hidden = true;
