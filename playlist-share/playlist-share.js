@@ -342,7 +342,7 @@
   function applyPointerStackPosition() {
     pointerStackRaf = null;
     if (!pointerStackEl) return;
-    pointerStackEl.style.transform = `translate3d(${pointerStackX + 14}px, ${pointerStackY + 14}px, 0)`;
+    pointerStackEl.style.transform = `translate3d(${pointerStackX + 34}px, ${pointerStackY + 28}px, 0)`;
   }
 
   function positionPointerStack(x = pointerStackX, y = pointerStackY) {
@@ -371,8 +371,8 @@
       card.style.setProperty('--stack-rotate', track.stackRotate || '0deg');
       card.style.setProperty('--stack-rest-y', `${i * -1}px`);
       card.style.setProperty('--stack-open-y', `${i * 54}px`);
-      card.style.setProperty('--stack-open-delay', `${i * 34}ms`);
-      card.style.setProperty('--stack-close-delay', `${(pointerTracks.length - 1 - i) * 28}ms`);
+      card.style.setProperty('--stack-open-delay', `${i * 76}ms`);
+      card.style.setProperty('--stack-close-delay', `${(pointerTracks.length - 1 - i) * 64}ms`);
       card.innerHTML = `
         <img src="${escapeHtml(track.coverUrl)}" alt="" draggable="false">
         <span>${escapeHtml(pointerCardTitle(track.title))}</span>
