@@ -529,6 +529,7 @@
     } catch {
       imported = [];
     }
+    sessionStorage.removeItem(POINTER_STACK_KEY);
 
     imported.forEach(track => {
       if (!track.id || !track.title || !track.artist || selectedIds.has(track.id)) return;

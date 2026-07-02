@@ -39,6 +39,10 @@
   let pointerStackEl = null;
   let pointerStackX = window.innerWidth / 2;
   let pointerStackY = window.innerHeight / 2;
+  let pointerStackRaf = null;
+  let pointerStackExpanded = false;
+  let pointerStackCreateHover = false;
+  let emptySpacePress = null;
   let pointerTracks = [];
   const detailCache = new Map();
   const detailFetches = new Map();
@@ -325,31 +329,34 @@
     return pointerStackEl;
   }
 
-  function persistPointerTracks() {
-    if (pointerTracks.length > 0) {
-      sessionStorage.setItem(POINTER_STACK_KEY, JSON.stringify(pointerTracks));
-    } else {
-      sessionStorage.removeItem(POINTER_STACK_KEY);
-    }
+  function persistPointerTracksForCreate() {
+    sessionStorage.setItem(POINTER_STACK_KEY, JSON.stringify(pointerTracks));
+  }
+
+  function applyPointerStackPosition() {
+    pointerStackRaf = null;
+    if (!pointerStackEl) return;
+    pointerStackEl.style.transform = `translate3d(${pointerStackX + 14}px, ${pointerStackY + 14}px, 0)`;
   }
 
   function positionPointerStack(x = pointerStackX, y = pointerStackY) {
     pointerStackX = x;
     pointerStackY = y;
-    if (!pointerStackEl) return;
-    pointerStackEl.style.transform = `translate(${x + 14}px, ${y + 14}px)`;
+    if (!pointerStackEl || pointerStackRaf) return;
+    pointerStackRaf = requestAnimationFrame(applyPointerStackPosition);
   }
 
   function renderPointerStack() {
     if (pointerTracks.length === 0) {
       if (pointerStackEl) pointerStackEl.remove();
       pointerStackEl = null;
-      persistPointerTracks();
+      pointerStackExpanded = false;
+      sessionStorage.removeItem(POINTER_STACK_KEY);
       return;
     }
 
     const stack = ensurePointerStackEl();
-    stack.innerHTML = '';
+    const fragment = document.createDocumentFragment();
     pointerTracks.forEach((track, i) => {
       const card = document.createElement('div');
       card.className = 'pointer-track-card';
@@ -358,12 +365,14 @@
         <img src="${escapeHtml(track.coverUrl)}" alt="" draggable="false">
         <span>${escapeHtml(track.title)}</span>
       `;
-      stack.appendChild(card);
+      fragment.appendChild(card);
     });
+    stack.replaceChildren(fragment);
     stack.dataset.count = `${pointerTracks.length}곡`;
     stack.classList.toggle('is-stacked', pointerTracks.length > 1);
+    stack.classList.toggle('is-expanded', pointerStackExpanded);
+    stack.classList.toggle('is-create-hover', pointerStackCreateHover);
     positionPointerStack();
-    persistPointerTracks();
   }
 
   function addPointerTrack(track, fallbackCoverUrl = '') {
@@ -379,16 +388,49 @@
     renderPointerStack();
   }
 
-  function loadPointerTracks() {
-    try {
-      const parsed = JSON.parse(sessionStorage.getItem(POINTER_STACK_KEY) || '[]');
-      pointerTracks = Array.isArray(parsed)
-        ? parsed.map(track => normalizedPointerTrack(track)).filter(track => track.id && track.title && track.artist)
-        : [];
-    } catch {
-      pointerTracks = [];
-    }
+  function setPointerStackExpanded(expanded) {
+    if (pointerTracks.length === 0) return;
+    pointerStackExpanded = expanded;
     renderPointerStack();
+  }
+
+  function setPointerStackCreateHover(isHovering) {
+    pointerStackCreateHover = isHovering && pointerTracks.length > 0;
+    if (pointerStackEl) pointerStackEl.classList.toggle('is-create-hover', pointerStackCreateHover);
+  }
+
+  function isEmptyPointerTarget(target) {
+    if (!target || target.closest('a,button,input,textarea,select,[role="button"],.share-card,.detail-track,.playlist-detail-card,.quick-card,.sort-tabs,.toolbar,.playlist-detail-backdrop,.quick-card-backdrop')) return false;
+    return Boolean(target.closest('body'));
+  }
+
+  function startEmptySpacePress(e) {
+    if (e.button !== undefined && e.button !== 0) return;
+    if (pointerTracks.length === 0 || !isEmptyPointerTarget(e.target)) return;
+    window.clearTimeout(emptySpacePress?.timer);
+    emptySpacePress = {
+      startX: e.clientX,
+      startY: e.clientY,
+      timer: window.setTimeout(() => {
+        if (!emptySpacePress) return;
+        setPointerStackExpanded(!pointerStackExpanded);
+        emptySpacePress = null;
+      }, 520),
+    };
+  }
+
+  function moveEmptySpacePress(e) {
+    if (!emptySpacePress) return;
+    if (Math.abs(e.clientX - emptySpacePress.startX) > 10 || Math.abs(e.clientY - emptySpacePress.startY) > 10) {
+      window.clearTimeout(emptySpacePress.timer);
+      emptySpacePress = null;
+    }
+  }
+
+  function clearEmptySpacePress() {
+    if (!emptySpacePress) return;
+    window.clearTimeout(emptySpacePress.timer);
+    emptySpacePress = null;
   }
 
   function attachDetailTrackPickup(item, track, fallbackCoverUrl) {
@@ -396,6 +438,7 @@
     let startX = 0;
     let startY = 0;
     let longPressed = false;
+    let cancelled = false;
 
     function clear() {
       window.clearTimeout(timer);
@@ -405,6 +448,7 @@
 
     function start(x, y) {
       longPressed = false;
+      cancelled = false;
       startX = x;
       startY = y;
       item.classList.add('is-pressing');
@@ -417,11 +461,14 @@
 
     function move(x, y) {
       if (!timer) return;
-      if (Math.abs(x - startX) > 10 || Math.abs(y - startY) > 10) clear();
+      if (Math.abs(x - startX) > 10 || Math.abs(y - startY) > 10) {
+        cancelled = true;
+        clear();
+      }
     }
 
     function end() {
-      const shouldAddByClick = pointerTracks.length > 0 && !longPressed;
+      const shouldAddByClick = pointerTracks.length > 0 && !longPressed && !cancelled;
       clear();
       if (shouldAddByClick) addPointerTrack(track, fallbackCoverUrl);
     }
@@ -623,12 +670,16 @@
   });
   navCreate.addEventListener('click', e => {
     e.preventDefault();
-    persistPointerTracks();
+    if (pointerTracks.length > 0) persistPointerTracksForCreate();
+    else sessionStorage.removeItem(POINTER_STACK_KEY);
     playWaveTransition(navCreate.getAttribute('href'));
   });
+  navCreate.addEventListener('pointerenter', () => setPointerStackCreateHover(true));
+  navCreate.addEventListener('pointerleave', () => setPointerStackCreateHover(false));
 
   document.querySelector('.logo').addEventListener('click', e => {
     e.preventDefault();
+    sessionStorage.removeItem(POINTER_STACK_KEY);
     playWaveTransition(e.currentTarget.getAttribute('href'));
   });
 
@@ -641,6 +692,11 @@
   });
 
   window.addEventListener('pointermove', e => positionPointerStack(e.clientX, e.clientY), { passive: true });
+  window.addEventListener('pointerdown', startEmptySpacePress);
+  window.addEventListener('pointermove', moveEmptySpacePress, { passive: true });
+  window.addEventListener('pointerup', clearEmptySpacePress);
+  window.addEventListener('pointercancel', clearEmptySpacePress);
+  window.addEventListener('blur', clearEmptySpacePress);
 
   if (sessionStorage.getItem('mp-transition') === '1') {
     sessionStorage.removeItem('mp-transition');
@@ -651,13 +707,14 @@
   }
 
   window.addEventListener('pageshow', e => {
+    if (e.persisted && pointerTracks.length > 0) clearPointerTracks();
     if (e.persisted && waveCovered) {
       playWaveIntro();
     }
   });
 
   const id = new URLSearchParams(location.search).get('id');
-  loadPointerTracks();
+  sessionStorage.removeItem(POINTER_STACK_KEY);
   loadList();
   if (id) showDetail(id);
 })();
