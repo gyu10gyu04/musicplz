@@ -342,7 +342,7 @@
   function applyPointerStackPosition() {
     pointerStackRaf = null;
     if (!pointerStackEl) return;
-    pointerStackEl.style.transform = `translate3d(${pointerStackX + 34}px, ${pointerStackY + 28}px, 0)`;
+    pointerStackEl.style.transform = `translate3d(${pointerStackX + 12}px, ${pointerStackY + 10}px, 0)`;
   }
 
   function positionPointerStack(x = pointerStackX, y = pointerStackY) {
@@ -350,6 +350,14 @@
     pointerStackY = y;
     if (!pointerStackEl || pointerStackRaf) return;
     pointerStackRaf = requestAnimationFrame(applyPointerStackPosition);
+  }
+
+  function syncPointerStackState() {
+    if (!pointerStackEl) return;
+    pointerStackEl.dataset.count = `${pointerTracks.length}곡`;
+    pointerStackEl.classList.toggle('is-stacked', pointerTracks.length > 1);
+    pointerStackEl.classList.toggle('is-expanded', pointerStackExpanded);
+    pointerStackEl.classList.toggle('is-create-hover', pointerStackCreateHover);
   }
 
   function renderPointerStack() {
@@ -362,10 +370,19 @@
     }
 
     const stack = ensurePointerStackEl();
-    const fragment = document.createDocumentFragment();
+    const existingCards = new Map([...stack.querySelectorAll('.pointer-track-card')].map(card => [card.dataset.trackId, card]));
+    const currentKeys = new Set(pointerTracks.map(track => String(track.id)));
+    const newExpandedCards = [];
+
+    existingCards.forEach((card, key) => {
+      if (!currentKeys.has(key)) card.remove();
+    });
+
     pointerTracks.forEach((track, i) => {
-      const card = document.createElement('div');
+      const key = String(track.id);
+      const card = existingCards.get(key) || document.createElement('div');
       card.className = 'pointer-track-card';
+      card.dataset.trackId = key;
       card.style.setProperty('--stack-i', i);
       card.style.setProperty('--stack-z', i + 1);
       card.style.setProperty('--stack-rotate', track.stackRotate || '0deg');
@@ -373,18 +390,29 @@
       card.style.setProperty('--stack-open-y', `${i * 54}px`);
       card.style.setProperty('--stack-open-delay', `${i * 76}ms`);
       card.style.setProperty('--stack-close-delay', `${(pointerTracks.length - 1 - i) * 64}ms`);
-      card.innerHTML = `
-        <img src="${escapeHtml(track.coverUrl)}" alt="" draggable="false">
-        <span>${escapeHtml(pointerCardTitle(track.title))}</span>
-      `;
-      fragment.appendChild(card);
+      if (!existingCards.has(key)) {
+        card.innerHTML = `
+          <img src="${escapeHtml(track.coverUrl)}" alt="" draggable="false">
+          <span>${escapeHtml(pointerCardTitle(track.title))}</span>
+        `;
+        if (pointerStackExpanded) {
+          card.style.transform = `translate3d(0, ${i * -1}px, 0) rotate(${track.stackRotate || '0deg'})`;
+          newExpandedCards.push(card);
+        }
+      }
+      stack.appendChild(card);
     });
-    stack.replaceChildren(fragment);
-    stack.dataset.count = `${pointerTracks.length}곡`;
-    stack.classList.toggle('is-stacked', pointerTracks.length > 1);
-    stack.classList.toggle('is-expanded', pointerStackExpanded);
-    stack.classList.toggle('is-create-hover', pointerStackCreateHover);
+    syncPointerStackState();
     positionPointerStack();
+
+    if (newExpandedCards.length > 0) {
+      newExpandedCards.forEach(card => card.getBoundingClientRect());
+      requestAnimationFrame(() => {
+        newExpandedCards.forEach(card => {
+          if (card.isConnected) card.style.transform = '';
+        });
+      });
+    }
   }
 
   function addPointerTrack(track, fallbackCoverUrl = '') {
@@ -403,7 +431,7 @@
   function setPointerStackExpanded(expanded) {
     if (pointerTracks.length === 0) return;
     pointerStackExpanded = expanded;
-    renderPointerStack();
+    syncPointerStackState();
   }
 
   function setPointerStackCreateHover(isHovering) {
