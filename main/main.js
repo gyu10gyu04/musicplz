@@ -26,7 +26,9 @@
   let target   = 0;
 
   const EASE   = 0.12;
-  const WSENS  = 1.15;
+  const WHEEL_LOCK_MS = 650;
+  const WHEEL_THRESHOLD = 8;
+  const TOUCH_THRESHOLD = 48;
 
   /* ─── 수학 헬퍼 ─── */
   const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
@@ -373,11 +375,16 @@
     needsRender = true;
   }
 
+  let wheelLocked = false;
   function onWheel(e) {
     e.preventDefault();
     const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-    target = clamp(target + delta * WSENS, 0, maxScroll);
-    needsRender = true;
+    if (wheelLocked || Math.abs(delta) < WHEEL_THRESHOLD) return;
+
+    wheelLocked = true;
+    const activeIndex = clamp(Math.round(target / sW), 0, sections.length - 1);
+    goTo(activeIndex + (delta > 0 ? 1 : -1));
+    window.setTimeout(() => { wheelLocked = false; }, WHEEL_LOCK_MS);
   }
 
   let tStartX = 0, tStartTarget = 0, touching = false;
@@ -388,7 +395,19 @@
     target = nextTarget;
     needsRender = true;
   }
-  function onTouchEnd() { touching=false; }
+  function onTouchEnd(e) {
+    if (!touching) return;
+    touching = false;
+    const endX = e.changedTouches?.[0]?.clientX ?? tStartX;
+    const dx = endX - tStartX;
+    const startIndex = clamp(Math.round(tStartTarget / sW), 0, sections.length - 1);
+
+    if (Math.abs(dx) < TOUCH_THRESHOLD) {
+      goTo(startIndex);
+    } else {
+      goTo(startIndex + (dx < 0 ? 1 : -1));
+    }
+  }
 
   function onKeydown(e) {
     const n = Math.round(target / sW);
