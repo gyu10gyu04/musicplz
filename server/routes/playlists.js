@@ -73,7 +73,7 @@ async function blockPlaylistBypass(req, token) {
 }
 
 async function blockAbnormalPlaylist(req, { playlist, deleted, reasons, geminiResult, spotifyVerification }) {
-  const banDurationHours = Math.min(Math.max(Math.round(Number(geminiResult?.banDurationHours) || 24), 1), 720);
+  const banDurationHours = Math.min(Math.max(Math.round(Number(geminiResult?.banDurationHours) || 24), 1), 2160);
   const blockedUntil = new Date(Date.now() + banDurationHours * HOUR_MS);
   const displayReason = cleanText(
     geminiResult?.displayReason || reasons[0] || '비정상적인 플레이리스트 생성이 감지되었습니다.',
@@ -195,7 +195,7 @@ async function inspectPlaylistSafety({ title, coverUrl, tracks }) {
     reasons,
     geminiResult,
     spotifyVerification,
-    banDurationHours: Math.min(Math.max(Math.round(Number(geminiResult.banDurationHours) || 24), 1), 720),
+    banDurationHours: Math.min(Math.max(Math.round(Number(geminiResult.banDurationHours) || 24), 1), 2160),
     displayReason: geminiResult.displayReason || reasons[0] || '비정상적인 플레이리스트 생성이 감지되었습니다.',
   };
 }

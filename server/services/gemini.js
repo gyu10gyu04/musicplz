@@ -84,10 +84,10 @@ const PLAYLIST_SAFETY_PROMPT = `너는 MusicPlz의 악성 플레이리스트 탐
 - 확실하지 않으면 abnormal=false로 둬.
 - confidence는 0부터 1 사이 숫자로 줘.
 - reasons는 최대 5개까지 짧게 작성해.
-- banDurationHours는 abnormal=true일 때만 1~720 사이 정수로 줘.
+- banDurationHours는 abnormal=true일 때만 1~2160 사이 정수로 줘.
 - 실제 음악 플레이리스트일 수도 있거나 오작동 가능성이 있으면 1~6시간처럼 짧게 줘.
-- 더미 텍스트, 잘못된 곡 ID, 반복값이 섞인 장난/실수로 보이면 12~72시간으로 줘.
-- 악성 코드, 쓰레기 파일/데이터 주입, 의도적인 공격이나 우회 시도로 보이면 168~720시간으로 길게 줘.
+- 더미 텍스트, 잘못된 곡 ID, 반복값이 섞인 장난/실수로 보이면 72~168시간으로 줘.
+- 악성 코드, 쓰레기 파일/데이터 주입, 의도적인 공격이나 우회 시도로 보이면 720~2160시간으로 길게 줘.
 - displayReason은 사용자가 이해할 수 있게 한국어로 간단히 쓰되 내부 검사명은 노출하지 마.`;
 
 /**
@@ -345,7 +345,7 @@ function parseGeminiPlaylistSafety(rawText) {
         ? parsed.reasons.map(reason => String(reason || '').trim()).filter(Boolean).slice(0, 5)
         : [],
       displayReason: String(parsed.displayReason || '').trim().slice(0, 200),
-      banDurationHours: Math.min(Math.max(Math.round(Number(parsed.banDurationHours) || 24), 1), 720),
+      banDurationHours: Math.min(Math.max(Math.round(Number(parsed.banDurationHours) || 24), 1), 2160),
     };
   } catch (err) {
     return { abnormal: false, confidence: 0, reasons: [], displayReason: '', banDurationHours: 24 };
