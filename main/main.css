@@ -370,14 +370,13 @@ h1{
 .playlist-card.is-stacked::before{opacity:1;}
 
 .card-cover{
-  width:100%;aspect-ratio:3/2;
+  width:100%;aspect-ratio:1/1;
   display:flex;align-items:center;justify-content:center;
   font-size:2.8rem;
   position:relative;overflow:hidden;
 }
 .card-cover img{
-  width:100%;height:100%;object-fit:contain;display:block;
-  background:#f7f7f7;
+  width:100%;height:100%;object-fit:cover;display:block;
 }
 .cover-1{background:#f3f0ff;}
 .cover-2{background:#f0fdf4;}

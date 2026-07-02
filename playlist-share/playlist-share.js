@@ -28,6 +28,7 @@
   const waveEl = document.getElementById('waveTransition');
   const wavePath = document.getElementById('wavePath');
   const navCreate = document.querySelector('.nav-create');
+  const POINTER_STACK_KEY = 'mp-share-pointer-tracks';
 
   let sort = 'latest';
   let currentPlaylist = null;
@@ -35,6 +36,10 @@
   let replyToCommentId = null;
   let waveCovered = false;
   let detailRequestId = 0;
+  let pointerStackEl = null;
+  let pointerStackX = window.innerWidth / 2;
+  let pointerStackY = window.innerHeight / 2;
+  let pointerTracks = [];
   const detailCache = new Map();
   const detailFetches = new Map();
   const savedOnly = new URLSearchParams(location.search).get('saved') === '1';
@@ -295,8 +300,141 @@
           <div class="detail-track-artist">${escapeHtml(track.artist)}</div>
         </div>
       `;
+      attachDetailTrackPickup(item, track, currentPlaylist.coverUrl);
       detailTrackList.appendChild(item);
     });
+  }
+
+  function normalizedPointerTrack(track, fallbackCoverUrl = '') {
+    return {
+      id: String(track.id || '').trim(),
+      title: String(track.title || '').trim(),
+      artist: String(track.artist || '').trim(),
+      album: String(track.album || '').trim(),
+      coverUrl: String(track.coverUrl || fallbackCoverUrl || '').trim(),
+      durationMs: Number(track.durationMs) || null,
+    };
+  }
+
+  function ensurePointerStackEl() {
+    if (pointerStackEl) return pointerStackEl;
+    pointerStackEl = document.createElement('div');
+    pointerStackEl.className = 'pointer-track-stack';
+    pointerStackEl.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(pointerStackEl);
+    return pointerStackEl;
+  }
+
+  function persistPointerTracks() {
+    if (pointerTracks.length > 0) {
+      sessionStorage.setItem(POINTER_STACK_KEY, JSON.stringify(pointerTracks));
+    } else {
+      sessionStorage.removeItem(POINTER_STACK_KEY);
+    }
+  }
+
+  function positionPointerStack(x = pointerStackX, y = pointerStackY) {
+    pointerStackX = x;
+    pointerStackY = y;
+    if (!pointerStackEl) return;
+    pointerStackEl.style.transform = `translate(${x + 14}px, ${y + 14}px)`;
+  }
+
+  function renderPointerStack() {
+    if (pointerTracks.length === 0) {
+      if (pointerStackEl) pointerStackEl.remove();
+      pointerStackEl = null;
+      persistPointerTracks();
+      return;
+    }
+
+    const stack = ensurePointerStackEl();
+    stack.innerHTML = '';
+    pointerTracks.forEach((track, i) => {
+      const card = document.createElement('div');
+      card.className = 'pointer-track-card';
+      card.style.setProperty('--stack-i', i);
+      card.innerHTML = `
+        <img src="${escapeHtml(track.coverUrl)}" alt="" draggable="false">
+        <span>${escapeHtml(track.title)}</span>
+      `;
+      stack.appendChild(card);
+    });
+    stack.dataset.count = `${pointerTracks.length}곡`;
+    stack.classList.toggle('is-stacked', pointerTracks.length > 1);
+    positionPointerStack();
+    persistPointerTracks();
+  }
+
+  function addPointerTrack(track, fallbackCoverUrl = '') {
+    const nextTrack = normalizedPointerTrack(track, fallbackCoverUrl);
+    if (!nextTrack.id || !nextTrack.title || !nextTrack.artist) return;
+    if (pointerTracks.some(existing => existing.id === nextTrack.id)) return;
+    pointerTracks.push(nextTrack);
+    renderPointerStack();
+  }
+
+  function clearPointerTracks() {
+    pointerTracks = [];
+    renderPointerStack();
+  }
+
+  function loadPointerTracks() {
+    try {
+      const parsed = JSON.parse(sessionStorage.getItem(POINTER_STACK_KEY) || '[]');
+      pointerTracks = Array.isArray(parsed)
+        ? parsed.map(track => normalizedPointerTrack(track)).filter(track => track.id && track.title && track.artist)
+        : [];
+    } catch {
+      pointerTracks = [];
+    }
+    renderPointerStack();
+  }
+
+  function attachDetailTrackPickup(item, track, fallbackCoverUrl) {
+    let timer = null;
+    let startX = 0;
+    let startY = 0;
+    let longPressed = false;
+
+    function clear() {
+      window.clearTimeout(timer);
+      timer = null;
+      item.classList.remove('is-pressing');
+    }
+
+    function start(x, y) {
+      longPressed = false;
+      startX = x;
+      startY = y;
+      item.classList.add('is-pressing');
+      timer = window.setTimeout(() => {
+        longPressed = true;
+        clear();
+        addPointerTrack(track, fallbackCoverUrl);
+      }, 480);
+    }
+
+    function move(x, y) {
+      if (!timer) return;
+      if (Math.abs(x - startX) > 10 || Math.abs(y - startY) > 10) clear();
+    }
+
+    function end() {
+      const shouldAddByClick = pointerTracks.length > 0 && !longPressed;
+      clear();
+      if (shouldAddByClick) addPointerTrack(track, fallbackCoverUrl);
+    }
+
+    item.addEventListener('pointerdown', e => {
+      if (e.button !== undefined && e.button !== 0) return;
+      start(e.clientX, e.clientY);
+    });
+    item.addEventListener('pointermove', e => move(e.clientX, e.clientY));
+    item.addEventListener('pointerup', end);
+    item.addEventListener('pointercancel', clear);
+    item.addEventListener('pointerleave', clear);
+    item.addEventListener('contextmenu', e => e.preventDefault());
   }
 
   async function toggleAction(type) {
@@ -485,6 +623,7 @@
   });
   navCreate.addEventListener('click', e => {
     e.preventDefault();
+    persistPointerTracks();
     playWaveTransition(navCreate.getAttribute('href'));
   });
 
@@ -494,8 +633,14 @@
   });
 
   window.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && pointerTracks.length > 0) {
+      clearPointerTracks();
+      return;
+    }
     if (e.key === 'Escape' && !playlistDetail.hidden) showList();
   });
+
+  window.addEventListener('pointermove', e => positionPointerStack(e.clientX, e.clientY), { passive: true });
 
   if (sessionStorage.getItem('mp-transition') === '1') {
     sessionStorage.removeItem('mp-transition');
@@ -512,6 +657,7 @@
   });
 
   const id = new URLSearchParams(location.search).get('id');
+  loadPointerTracks();
   loadList();
   if (id) showDetail(id);
 })();

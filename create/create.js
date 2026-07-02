@@ -498,6 +498,7 @@
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
   const selectedIds   = new Set();
   const selectedOrder = []; // 담은 순서를 유지 (트레이 표시용)
+  const POINTER_STACK_KEY = 'mp-share-pointer-tracks';
 
   const tray         = document.getElementById('tray');
   const trayCount    = document.getElementById('trayCount');
@@ -507,6 +508,36 @@
 
   function trackById(id) {
     return knownTracks.get(id);
+  }
+
+  function normalizeImportedTrack(track) {
+    return {
+      id: String(track?.id || '').trim(),
+      title: String(track?.title || '').trim(),
+      artist: String(track?.artist || '').trim(),
+      album: String(track?.album || '').trim(),
+      coverUrl: String(track?.coverUrl || '').trim(),
+      durationMs: Number(track?.durationMs) || null,
+    };
+  }
+
+  function importPointerStackTracks() {
+    let imported = [];
+    try {
+      const parsed = JSON.parse(sessionStorage.getItem(POINTER_STACK_KEY) || '[]');
+      imported = Array.isArray(parsed) ? parsed.map(normalizeImportedTrack) : [];
+    } catch {
+      imported = [];
+    }
+
+    imported.forEach(track => {
+      if (!track.id || !track.title || !track.artist || selectedIds.has(track.id)) return;
+      knownTracks.set(track.id, track);
+      selectedIds.add(track.id);
+      selectedOrder.push(track.id);
+    });
+
+    if (selectedOrder.length > 0) renderTray();
   }
 
   function toggleTrack(track) {
@@ -1627,4 +1658,5 @@
 
   /* 초기 상태 */
   showOnly('empty');
+  importPointerStackTracks();
 })();
