@@ -416,27 +416,69 @@ h1{
 .card-play:hover{background:#7c3aed;transform:scale(1.14);}
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-   섹션 3: 피처 그리드
+   섹션 3: AI 플레이리스트 평가
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
-.feature-grid{
-  display:grid;grid-template-columns:1fr 1fr;
-  gap:14px;margin-top:2.5rem;max-width:640px;
+.ai-review-layout{
+  display:grid;grid-template-columns:minmax(0,.92fr) minmax(360px,1fr);
+  align-items:center;gap:52px;
 }
-/* JS가 초기값 설정하기 전 깜빡임 방지 */
-.feature-item{
-  background:#fff;border:1px solid #ebebeb;
-  border-radius:16px;padding:22px;
-  will-change:transform,opacity;
-  opacity:0;transform:translateY(36px) translateZ(0);
+.ai-review-copy{min-width:0;}
+.ai-review-points{display:flex;gap:9px;flex-wrap:wrap;margin-top:-1rem;}
+.ai-review-points span{
+  display:inline-flex;align-items:center;
+  padding:8px 13px;border:1px solid rgba(124,58,237,.16);
+  border-radius:999px;background:rgba(124,58,237,.06);
+  color:#6d28d9;font-size:.78rem;font-weight:800;
 }
-.feat-icon{
-  width:38px;height:38px;border-radius:10px;
-  display:flex;align-items:center;justify-content:center;
-  font-size:1.2rem;margin-bottom:12px;
-  background:#f7f7f7;
+.ai-chat-card{
+  position:relative;overflow:hidden;
+  border:1px solid rgba(124,58,237,.14);
+  border-radius:28px;background:linear-gradient(145deg,rgba(255,255,255,.94),rgba(248,245,255,.88));
+  box-shadow:0 24px 70px rgba(42,24,84,.16), inset 0 1px 0 rgba(255,255,255,.9);
+  padding:18px;
 }
-.feat-title{font-size:.9rem;font-weight:700;color:#0a0a0a;margin-bottom:5px;}
-.feat-desc{font-size:.8rem;color:rgba(0,0,0,.40);line-height:1.65;}
+.ai-chat-card::before{
+  content:'';position:absolute;right:-90px;top:-110px;width:260px;height:260px;
+  border-radius:50%;background:radial-gradient(circle,rgba(124,58,237,.18),rgba(124,58,237,0) 68%);
+  pointer-events:none;
+}
+.ai-chat-head{position:relative;z-index:1;display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:14px;}
+.ai-chat-kicker{font-size:.68rem;font-weight:900;letter-spacing:1.8px;text-transform:uppercase;color:#7c3aed;margin-bottom:4px;}
+.ai-chat-head h2{font-size:1.25rem;letter-spacing:-.04em;line-height:1.15;}
+.ai-chat-badge{padding:7px 11px;border-radius:999px;background:#111;color:#fff;font-size:.72rem;font-weight:900;}
+.ai-chat-log{
+  position:relative;z-index:1;height:245px;overflow-y:auto;
+  display:flex;flex-direction:column;gap:10px;
+  padding:12px;border:1px solid rgba(255,255,255,.78);border-radius:20px;
+  background:rgba(255,255,255,.58);
+}
+.ai-message{max-width:92%;padding:11px 13px;border-radius:16px;font-size:.84rem;line-height:1.55;}
+.ai-message strong{display:block;margin-bottom:5px;font-size:.72rem;color:rgba(0,0,0,.42);}
+.ai-message p{margin:0;color:rgba(0,0,0,.72);}
+.ai-message-user{align-self:flex-end;background:#7c3aed;color:#fff;border-bottom-right-radius:5px;}
+.ai-message-user strong,.ai-message-user p{color:#fff;}
+.ai-message-bot{align-self:flex-start;background:#fff;border:1px solid rgba(124,58,237,.10);border-bottom-left-radius:5px;box-shadow:0 8px 24px rgba(36,20,72,.06);}
+.ai-review-result{display:grid;gap:10px;}
+.ai-score{font-size:1.9rem;font-weight:950;letter-spacing:-.06em;color:#7c3aed;line-height:1;}
+.ai-score span{font-size:.9rem;color:rgba(0,0,0,.38);}
+.ai-result-block{padding-top:8px;border-top:1px solid rgba(124,58,237,.10);}
+.ai-result-block b{display:block;margin-bottom:4px;color:#16101f;font-size:.78rem;}
+.ai-result-block ul{margin:4px 0 0 16px;padding:0;color:rgba(0,0,0,.68);}
+.ai-result-block li{margin-top:3px;}
+.ai-review-form{position:relative;z-index:1;display:grid;grid-template-columns:1fr auto;gap:9px;margin-top:12px;}
+.ai-review-form input,.ai-review-form textarea{
+  width:100%;border:1px solid rgba(124,58,237,.16);outline:none;
+  background:rgba(255,255,255,.82);color:#111;border-radius:14px;
+  font:inherit;font-size:.84rem;
+}
+.ai-review-form input{padding:11px 13px;}
+.ai-review-form textarea{grid-column:1/-1;min-height:92px;max-height:128px;resize:vertical;padding:12px 13px;line-height:1.5;}
+.ai-review-form input:focus,.ai-review-form textarea:focus{border-color:#7c3aed;box-shadow:0 0 0 3px rgba(124,58,237,.10);}
+.ai-review-form button{
+  grid-column:2;grid-row:1;border:none;border-radius:14px;padding:0 16px;
+  background:#111;color:#fff;font-size:.82rem;font-weight:900;cursor:pointer;
+}
+.ai-review-form button:disabled{opacity:.48;cursor:not-allowed;}
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    섹션 4: CTA
@@ -496,6 +538,9 @@ h1{
   h1{font-size:3rem;letter-spacing:-2px;}
   .cta-head{font-size:3.5rem;letter-spacing:-2.5px;}
   .card-container{flex-direction:column;}
-  .feature-grid{grid-template-columns:1fr;}
+  .ai-review-layout{grid-template-columns:1fr;gap:20px;padding-top:72px;padding-bottom:24px;}
+  .ai-chat-log{height:220px;}
+  .ai-review-form{grid-template-columns:1fr;}
+  .ai-review-form button{grid-column:1;grid-row:auto;height:42px;}
   .stat-row{gap:20px;}
 }

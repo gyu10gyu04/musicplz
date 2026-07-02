@@ -90,6 +90,29 @@ const PLAYLIST_SAFETY_PROMPT = `너는 MusicPlz의 악성 플레이리스트 탐
 - 악성 코드, 쓰레기 파일/데이터 주입, 의도적인 공격이나 우회 시도로 보이면 720~2160시간으로 길게 줘.
 - displayReason은 사용자가 이해할 수 있게 한국어로 간단히 쓰되 내부 검사명은 노출하지 마.`;
 
+const PLAYLIST_REVIEW_PROMPT = `너는 MusicPlz의 플레이리스트 평가 전용 AI야.
+너는 미식가가 코스 요리를 평가하듯 플레이리스트에 있는 곡들을 듣고, 씹고, 맛보고, 즐기면서 평가해야 해.
+
+반드시 아래 JSON 형식으로만 응답해. 다른 설명, 코드블록 표시 없이 순수 JSON만 출력해:
+{
+  "score": 0,
+  "verdict": "한 줄 총평",
+  "tastingNote": "플레이리스트를 음식/코스처럼 맛본 감각적인 평가",
+  "flow": "곡 순서와 감정선, 분위기 흐름 평가",
+  "beatMatch": "각 곡의 비트/템포/그루브가 서로 어울리는지 평가",
+  "highlights": ["좋았던 포인트 최대 3개"],
+  "fixes": ["개선하면 좋은 포인트 최대 3개"],
+  "closing": "플리 제작자에게 건네는 짧은 마무리"
+}
+
+규칙:
+- 플레이리스트 평가 전용으로만 답해. 일반 잡담이나 음악 검색 요청처럼 답하지 마.
+- 점수는 0~100 정수로 줘.
+- 곡 제목과 아티스트를 근거로 장르, 분위기, 에너지, 비트 연결감을 추론해.
+- 실제 오디오를 직접 들었다고 단정하지 말고, 곡 정보 기반 평가라는 전제를 자연스럽게 유지해.
+- 무조건 칭찬만 하지 말고, 순서/흐름/비트/분위기 연결에서 구체적인 개선점을 줘.
+- 말투는 한국어, 날카롭지만 재밌고 음악 미식가 같은 톤으로 해.`;
+
 /**
  * 사용자 문장을 해석해서 Spotify 검색어 + 화면 표시용 해석 문구를 만듦.
  * @param {string} userQuery - 사용자가 입력한 원문 문장
@@ -263,6 +286,43 @@ async function analyzePlaylistSafety(playlist) {
   return parseGeminiPlaylistSafety(rawText);
 }
 
+async function reviewPlaylistTaste(playlist) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      'GEMINI_API_KEY 환경 변수가 설정되어 있지 않습니다. ' +
+      '.env 파일에 Google AI Studio에서 발급받은 키를 넣어주세요.'
+    );
+  }
+
+  const safePlaylist = {
+    title: String(playlist?.title || '').trim().slice(0, 120),
+    tracksText: String(playlist?.tracksText || '').trim().slice(0, 5000),
+  };
+
+  const res = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      system_instruction: { parts: [{ text: PLAYLIST_REVIEW_PROMPT }] },
+      contents: [{ role: 'user', parts: [{ text: JSON.stringify(safePlaylist, null, 2) }] }],
+      generationConfig: {
+        temperature: 0.75,
+        maxOutputTokens: 900,
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Gemini 플레이리스트 평가 실패 (status ${res.status}): ${text}`);
+  }
+
+  const data = await res.json();
+  const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  return parseGeminiPlaylistReview(rawText);
+}
+
 /**
  * Gemini 응답에서 JSON을 안전하게 파싱.
  * 모델이 코드블록(```json ... ```)으로 감싸서 응답하는 경우도 있어 그 부분을 먼저 벗겨낸다.
@@ -352,4 +412,37 @@ function parseGeminiPlaylistSafety(rawText) {
   }
 }
 
-module.exports = { interpretSearchQuery, suggestArtistAlbumNames, suggestPlaylistCoverQueries, analyzePlaylistSafety };
+function parseGeminiPlaylistReview(rawText) {
+  const cleaned = rawText.trim().replace(/^```json\s*|^```\s*|```$/g, '').trim();
+
+  try {
+    const parsed = JSON.parse(cleaned);
+    return {
+      score: Math.min(Math.max(Math.round(Number(parsed.score) || 0), 0), 100),
+      verdict: String(parsed.verdict || '').trim().slice(0, 160),
+      tastingNote: String(parsed.tastingNote || '').trim().slice(0, 700),
+      flow: String(parsed.flow || '').trim().slice(0, 700),
+      beatMatch: String(parsed.beatMatch || '').trim().slice(0, 700),
+      highlights: Array.isArray(parsed.highlights)
+        ? parsed.highlights.map(item => String(item || '').trim()).filter(Boolean).slice(0, 3)
+        : [],
+      fixes: Array.isArray(parsed.fixes)
+        ? parsed.fixes.map(item => String(item || '').trim()).filter(Boolean).slice(0, 3)
+        : [],
+      closing: String(parsed.closing || '').trim().slice(0, 240),
+    };
+  } catch (err) {
+    return {
+      score: 0,
+      verdict: '평가를 정리하지 못했어요.',
+      tastingNote: 'Gemini 응답을 해석하지 못했습니다. 곡 목록을 조금 더 구체적으로 적어 다시 요청해주세요.',
+      flow: '',
+      beatMatch: '',
+      highlights: [],
+      fixes: ['곡 제목과 아티스트를 한 줄에 하나씩 적어주세요.'],
+      closing: '',
+    };
+  }
+}
+
+module.exports = { interpretSearchQuery, suggestArtistAlbumNames, suggestPlaylistCoverQueries, analyzePlaylistSafety, reviewPlaylistTaste };

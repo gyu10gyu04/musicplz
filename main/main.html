@@ -174,33 +174,39 @@
         </div>
       </section>
 
-      <!-- ─── 섹션 3: 프로필 ─── -->
+      <!-- ─── 섹션 3: AI 플레이리스트 평가 ─── -->
       <section id="feature-sub">
-        <div class="section-inner" data-depth="0.20">
-          <p class="tagline">Your Identity</p>
-          <h1>나만의 음악 정체성을<br><span class="gradient-text">프로필에 담다.</span></h1>
-          <p class="description">마음에 드는 큐레이터를 팔로우하고, 나만의 컬렉션을 완성하세요.</p>
-          <div class="feature-grid" id="featureGrid">
-            <div class="feature-item">
-              <div class="feat-icon">🎵</div>
-              <div class="feat-title">플레이리스트 큐레이션</div>
-              <div class="feat-desc">직접 만든 플레이리스트를 업로드하고 팬들과 공유하세요.</div>
+        <div class="section-inner ai-review-layout" data-depth="0.20">
+          <div class="ai-review-copy">
+            <p class="tagline">Gemini Playlist Critic</p>
+            <h1>플리를 씹고,<br><span class="gradient-text">맛보고, 평가하다.</span></h1>
+            <p class="description">곡 목록을 넣으면 Gemini가 음악 미식가처럼 순서, 흐름, 분위기, 비트 궁합을 평가해줘요.</p>
+            <div class="ai-review-points">
+              <span>곡 순서</span>
+              <span>무드 흐름</span>
+              <span>비트 궁합</span>
             </div>
-            <div class="feature-item">
-              <div class="feat-icon">👤</div>
-              <div class="feat-title">뮤직 프로필</div>
-              <div class="feat-desc">나의 장르 취향과 최애 아티스트가 담긴 나만의 페이지.</div>
+          </div>
+
+          <div class="ai-chat-card" id="aiReviewCard">
+            <div class="ai-chat-head">
+              <div>
+                <div class="ai-chat-kicker">AI Tasting Room</div>
+                <h2>플리 평가 전용 채팅</h2>
+              </div>
+              <div class="ai-chat-badge">Gemini</div>
             </div>
-            <div class="feature-item">
-              <div class="feat-icon">💜</div>
-              <div class="feat-title">팔로우 & 디깅</div>
-              <div class="feat-desc">취향이 맞는 큐레이터를 팔로우해 새 음악을 발견하세요.</div>
+            <div class="ai-chat-log" id="aiReviewLog" aria-live="polite">
+              <div class="ai-message ai-message-bot">
+                <strong>Gemini 평론가</strong>
+                <p>플리 제목과 곡 목록을 던져줘. 코스 요리처럼 순서와 흐름, 비트의 씹는 맛까지 평가해볼게.</p>
+              </div>
             </div>
-            <div class="feature-item">
-              <div class="feat-icon">🔔</div>
-              <div class="feat-title">실시간 알림</div>
-              <div class="feat-desc">팔로잉한 큐레이터가 새 플레이리스트를 올리면 바로 알림.</div>
-            </div>
+            <form class="ai-review-form" id="aiReviewForm">
+              <input type="text" id="aiReviewTitle" maxlength="120" placeholder="플리 제목 (선택)">
+              <textarea id="aiReviewTracks" maxlength="5000" placeholder="곡 목록을 한 줄에 하나씩 입력\n예: NewJeans - Ditto\nFrank Ocean - Pink + White\nCrush - Beautiful"></textarea>
+              <button type="submit" id="aiReviewSubmit">평가 받기</button>
+            </form>
           </div>
         </div>
       </section>

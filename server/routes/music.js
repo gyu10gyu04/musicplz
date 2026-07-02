@@ -9,7 +9,7 @@
 //   GET  /api/music/artist/:artistId/albums — 아티스트 다른 앨범 목록 (캐러셀용)
 
 const express = require('express');
-const { interpretSearchQuery, suggestArtistAlbumNames, suggestPlaylistCoverQueries } = require('../services/gemini');
+const { interpretSearchQuery, suggestArtistAlbumNames, suggestPlaylistCoverQueries, reviewPlaylistTaste } = require('../services/gemini');
 const { searchTracks, getAlbumTracks, getArtistAlbums, searchAlbumsByArtistAndNames } = require('../services/spotify');
 
 const router = express.Router();
@@ -71,6 +71,22 @@ router.post('/playlist-cover-candidates', async (req, res, next) => {
     }
 
     res.json({ covers });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/playlist-review', async (req, res, next) => {
+  try {
+    const title = cleanText(req.body?.title, 120);
+    const tracksText = cleanText(req.body?.tracksText, 5000);
+
+    if (!tracksText) {
+      return res.status(400).json({ error: '평가받을 플레이리스트 곡 목록을 입력해주세요.' });
+    }
+
+    const review = await reviewPlaylistTaste({ title, tracksText });
+    res.json({ review });
   } catch (err) {
     next(err);
   }
