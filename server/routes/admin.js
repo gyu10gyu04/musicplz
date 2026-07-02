@@ -1,5 +1,5 @@
 const express = require('express');
-const { listBlockedIps } = require('../models/blockedIps');
+const { listBlockedUsers } = require('../models/blockedUsers');
 const { findById } = require('../models/users');
 
 const router = express.Router();
@@ -32,11 +32,11 @@ async function requireAdmin(req, res, next) {
   }
 }
 
-router.get('/blocked-ips', requireAdmin, async (req, res, next) => {
+router.get('/blocked-users', requireAdmin, async (req, res, next) => {
   try {
     const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 500);
-    const blockedIps = await listBlockedIps({ limit });
-    res.json({ blockedIps });
+    const blockedUsers = await listBlockedUsers({ limit });
+    res.json({ blockedUsers });
   } catch (err) {
     next(err);
   }

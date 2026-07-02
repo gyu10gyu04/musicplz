@@ -18,7 +18,7 @@ const {
   recentPlaylistCount,
   recentCommentCount,
 } = require('../models/playlists');
-const { blockIp } = require('../models/blockedIps');
+const { blockUser } = require('../models/blockedUsers');
 const { analyzePlaylistSafety } = require('../services/gemini');
 const { verifyTrackIds } = require('../services/spotify');
 
@@ -55,11 +55,11 @@ function safeEqual(a, b) {
 }
 
 async function blockPlaylistBypass(req, token) {
-  await blockIp({
-    ipAddress: req.ip,
-    userId: req.session.userId || null,
+  await blockUser({
+    userId: req.session.userId,
     reason: 'playlist_create_bypass',
     metadata: {
+      ipAddress: req.ip,
       path: req.originalUrl,
       method: req.method,
       userAgent: req.get('user-agent') || '',
@@ -69,11 +69,11 @@ async function blockPlaylistBypass(req, token) {
 }
 
 async function blockAbnormalPlaylist(req, { playlist, deleted, reasons, geminiResult, spotifyVerification }) {
-  await blockIp({
-    ipAddress: req.ip,
-    userId: req.session.userId || null,
+  await blockUser({
+    userId: req.session.userId,
     reason: 'playlist_safety_abnormal',
     metadata: {
+      ipAddress: req.ip,
       playlistId: playlist.id,
       deleted,
       reasons,
