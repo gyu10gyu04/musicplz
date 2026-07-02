@@ -48,19 +48,21 @@
         <button type="button" class="back-btn" id="backToList" aria-label="상세 닫기">
           <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
-        <div class="detail-head">
-          <img id="detailCover" alt="" class="detail-cover">
-          <div class="detail-meta">
-            <p class="tagline">Shared Playlist</p>
-            <h2 id="detailTitle"></h2>
-            <p id="detailByline"></p>
-            <div class="detail-actions">
-              <button type="button" id="likeBtn"></button>
-              <button type="button" id="saveBtn"></button>
+        <div class="playlist-detail-content">
+          <div class="detail-head">
+            <img id="detailCover" alt="" class="detail-cover">
+            <div class="detail-meta">
+              <p class="tagline">Shared Playlist</p>
+              <h2 id="detailTitle"></h2>
+              <p id="detailByline"></p>
+              <div class="detail-actions">
+                <button type="button" id="likeBtn"></button>
+                <button type="button" id="saveBtn"></button>
+              </div>
             </div>
           </div>
+          <div class="detail-track-list" id="detailTrackList"></div>
         </div>
-        <div class="detail-track-list" id="detailTrackList"></div>
       </div>
     </section>
   </main>
@@ -74,20 +76,10 @@
           <p class="tagline">Playlist Info</p>
           <h2 id="quickTitle"></h2>
           <p id="quickOwner"></p>
-          <div class="quick-stats" id="quickStats"></div>
           <div class="quick-owner-actions" id="quickOwnerActions" hidden>
             <button type="button" id="quickEditBtn">수정</button>
             <button type="button" id="quickDeleteBtn" class="danger">삭제</button>
           </div>
-        </div>
-      </div>
-      <div class="quick-chat-pane">
-        <div class="quick-chat-head">채팅</div>
-        <div class="quick-comments" id="quickComments"></div>
-        <div class="quick-reply-state" id="quickReplyState" hidden></div>
-        <div class="quick-comment-form">
-          <input type="text" id="quickCommentInput" maxlength="500" placeholder="댓글 달기">
-          <button type="button" id="quickCommentSend">등록</button>
         </div>
       </div>
     </div>

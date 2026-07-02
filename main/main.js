@@ -25,7 +25,7 @@
   let current  = 0;
   let target   = 0;
 
-  const EASE   = 0.12;
+  const EASE   = 0.105;
   const WHEEL_LOCK_MS = 650;
   const WHEEL_THRESHOLD = 8;
   const TOUCH_THRESHOLD = 48;

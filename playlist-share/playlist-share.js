@@ -246,12 +246,12 @@
     quickCover.src = playlist.coverUrl;
     quickTitle.textContent = playlist.title;
     quickOwner.textContent = `플리주인 @${playlist.displayName || 'MusicPlz'}`;
-    quickStats.textContent = `${playlist.trackCount || 0} tracks · ♥ ${playlist.likeCount || 0} · 저장 ${playlist.saveCount || 0}`;
+    if (quickStats) quickStats.textContent = `${playlist.trackCount || 0} tracks · ♥ ${playlist.likeCount || 0} · 저장 ${playlist.saveCount || 0}`;
     quickOwnerActions.hidden = !playlist.isOwner;
-    quickCommentInput.value = '';
-    quickReplyState.hidden = true;
+    if (quickCommentInput) quickCommentInput.value = '';
+    if (quickReplyState) quickReplyState.hidden = true;
     quickCardBackdrop.hidden = false;
-    loadQuickComments();
+    if (quickComments) loadQuickComments();
     requestAnimationFrame(() => quickCardBackdrop.classList.add('is-open'));
   }
 
@@ -733,14 +733,16 @@
   });
   quickEditBtn.addEventListener('click', () => alert('수정 기능은 다음 단계에서 연결할게요.'));
   quickDeleteBtn.addEventListener('click', deleteCurrentQuickPlaylist);
-  quickCommentSend.addEventListener('click', submitQuickComment);
-  quickCommentInput.addEventListener('keydown', e => {
-    if (e.key === 'Enter') submitQuickComment();
-    if (e.key === 'Escape') {
-      replyToCommentId = null;
-      quickReplyState.hidden = true;
-    }
-  });
+  if (quickCommentSend && quickCommentInput) {
+    quickCommentSend.addEventListener('click', submitQuickComment);
+    quickCommentInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') submitQuickComment();
+      if (e.key === 'Escape') {
+        replyToCommentId = null;
+        if (quickReplyState) quickReplyState.hidden = true;
+      }
+    });
+  }
   navCreate.addEventListener('click', e => {
     e.preventDefault();
     if (pointerTracks.length > 0) persistPointerTracksForCreate();

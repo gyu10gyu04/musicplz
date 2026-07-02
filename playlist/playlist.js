@@ -209,7 +209,7 @@
     quickCover.src = playlist.coverUrl;
     quickTitle.textContent = playlist.title;
     quickOwner.textContent = `플리주인 @${playlist.displayName || 'MusicPlz'}`;
-    quickStats.textContent = `${playlist.trackCount || 0} tracks · ♥ ${playlist.likeCount || 0} · 저장 ${playlist.saveCount || 0}`;
+    if (quickStats) quickStats.textContent = `${playlist.trackCount || 0} tracks · ♥ ${playlist.likeCount || 0} · 저장 ${playlist.saveCount || 0}`;
     quickOwnerActions.hidden = !playlist.isOwner;
     quickCardBackdrop.hidden = false;
     requestAnimationFrame(() => quickCardBackdrop.classList.add('is-open'));
@@ -234,8 +234,8 @@
     playlistGrid.hidden = true;
     emptyState.hidden = true;
     playlistDetail.hidden = false;
-    quickCommentInput.value = '';
-    quickReplyState.hidden = true;
+    if (quickCommentInput) quickCommentInput.value = '';
+    if (quickReplyState) quickReplyState.hidden = true;
 
     detailCover.src = currentPlaylist.coverUrl;
     detailTitle.textContent = currentPlaylist.title;
@@ -259,7 +259,7 @@
       `;
       detailTrackList.appendChild(item);
     });
-    loadQuickComments();
+    if (quickComments) loadQuickComments();
   }
 
   async function toggleAction(type) {
@@ -432,14 +432,16 @@
   });
   quickEditBtn.addEventListener('click', () => alert('수정 기능은 다음 단계에서 연결할게요.'));
   quickDeleteBtn.addEventListener('click', deleteCurrentQuickPlaylist);
-  quickCommentSend.addEventListener('click', submitQuickComment);
-  quickCommentInput.addEventListener('keydown', e => {
-    if (e.key === 'Enter') submitQuickComment();
-    if (e.key === 'Escape') {
-      replyToCommentId = null;
-      quickReplyState.hidden = true;
-    }
-  });
+  if (quickCommentSend && quickCommentInput) {
+    quickCommentSend.addEventListener('click', submitQuickComment);
+    quickCommentInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') submitQuickComment();
+      if (e.key === 'Escape') {
+        replyToCommentId = null;
+        if (quickReplyState) quickReplyState.hidden = true;
+      }
+    });
+  }
   navCreate.addEventListener('click', e => {
     e.preventDefault();
     playWaveTransition(navCreate.getAttribute('href'));
