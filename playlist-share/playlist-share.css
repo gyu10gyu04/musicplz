@@ -143,3 +143,16 @@ nav{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-con
   .quick-cover{width:150px;height:150px;}
   .quick-chat-pane{border-left:none;border-top:1px solid rgba(124,58,237,.14);padding-left:0;padding-top:16px;max-height:none;}
 }
+
+body{padding-top:79px;}
+nav{position:fixed;left:0;right:0;top:0;transform:translateY(0);transition:transform .24s ease;}
+nav.is-hidden{transform:translateY(-100%);}
+.playlist-detail-backdrop{align-items:flex-start;padding-top:92px;overflow:auto;}
+.playlist-detail-backdrop.is-open .playlist-detail-card{transform:scale(1) translateY(18px);}
+.pointer-track-stack::before{left:-12px;top:-10px;}
+
+@media(max-width:680px){
+  body{padding-top:72px;}
+  .playlist-detail-backdrop{padding-top:70px;}
+  .playlist-detail-backdrop.is-open .playlist-detail-card{transform:scale(1) translateY(10px);}
+}

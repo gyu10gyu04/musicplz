@@ -27,6 +27,7 @@
   const quickReplyState = document.getElementById('quickReplyState');
   const waveEl = document.getElementById('waveTransition');
   const wavePath = document.getElementById('wavePath');
+  const nav = document.querySelector('nav');
   const navCreate = document.querySelector('.nav-create');
   const POINTER_STACK_KEY = 'mp-share-pointer-tracks';
 
@@ -43,6 +44,8 @@
   let pointerStackExpanded = false;
   let pointerStackCreateHover = false;
   let emptySpacePress = null;
+  let lastScrollY = window.scrollY;
+  let navScrollRaf = null;
   let pointerTracks = [];
   const detailCache = new Map();
   const detailFetches = new Map();
@@ -439,6 +442,19 @@
     if (pointerStackEl) pointerStackEl.classList.toggle('is-create-hover', pointerStackCreateHover);
   }
 
+  function syncNavVisibility() {
+    navScrollRaf = null;
+    const currentY = window.scrollY;
+    const isScrollingDown = currentY > lastScrollY && currentY > 24;
+    nav.classList.toggle('is-hidden', isScrollingDown);
+    lastScrollY = currentY;
+  }
+
+  function scheduleNavVisibility() {
+    if (navScrollRaf) return;
+    navScrollRaf = requestAnimationFrame(syncNavVisibility);
+  }
+
   function isEmptyPointerTarget(target) {
     if (!target || target.closest('a,button,input,textarea,select,[role="button"],.share-card,.detail-track,.playlist-detail-card,.quick-card,.sort-tabs,.toolbar,.playlist-detail-backdrop,.quick-card-backdrop')) return false;
     return Boolean(target.closest('body'));
@@ -732,6 +748,7 @@
   });
 
   window.addEventListener('pointermove', e => positionPointerStack(e.clientX, e.clientY), { passive: true });
+  window.addEventListener('scroll', scheduleNavVisibility, { passive: true });
   window.addEventListener('pointerdown', startEmptySpacePress);
   window.addEventListener('pointermove', moveEmptySpacePress, { passive: true });
   window.addEventListener('pointerup', clearEmptySpacePress);
