@@ -318,7 +318,7 @@
       album: String(track.album || '').trim(),
       coverUrl: String(track.coverUrl || fallbackCoverUrl || '').trim(),
       durationMs: Number(track.durationMs) || null,
-      stackRotate: track.stackRotate || `${(((Array.from(id).reduce((sum, char) => sum + char.charCodeAt(0), 0) % 9) - 4) * .55).toFixed(2)}deg`,
+      stackRotate: track.stackRotate || `${(((Array.from(id).reduce((sum, char) => sum + char.charCodeAt(0), 0) % 9) - 4) * 1.15).toFixed(2)}deg`,
     };
   }
 
@@ -371,8 +371,8 @@
       card.style.setProperty('--stack-rotate', track.stackRotate || '0deg');
       card.style.setProperty('--stack-rest-y', `${i * -1}px`);
       card.style.setProperty('--stack-open-y', `${i * 54}px`);
-      card.style.setProperty('--stack-open-delay', `${i * 22}ms`);
-      card.style.setProperty('--stack-close-delay', `${(pointerTracks.length - 1 - i) * 18}ms`);
+      card.style.setProperty('--stack-open-delay', `${i * 34}ms`);
+      card.style.setProperty('--stack-close-delay', `${(pointerTracks.length - 1 - i) * 28}ms`);
       card.innerHTML = `
         <img src="${escapeHtml(track.coverUrl)}" alt="" draggable="false">
         <span>${escapeHtml(pointerCardTitle(track.title))}</span>
