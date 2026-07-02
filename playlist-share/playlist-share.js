@@ -467,6 +467,6 @@
   });
 
   const id = new URLSearchParams(location.search).get('id');
+  loadList();
   if (id) showDetail(id);
-  else loadList();
 })();

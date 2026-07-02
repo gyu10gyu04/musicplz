@@ -102,7 +102,7 @@ async function listPlaylists({ query = '', sort = 'latest', userId = null, saved
        BOOL_OR(pl.user_id = ${userParam}) AS liked,
        BOOL_OR(ps.user_id = ${userParam}) AS saved
      FROM playlists p
-     JOIN users u ON u.id = p.user_id
+     LEFT JOIN users u ON u.id = p.user_id
      LEFT JOIN playlist_tracks pt ON pt.playlist_id = p.id
      LEFT JOIN playlist_likes pl ON pl.playlist_id = p.id
      LEFT JOIN playlist_saves ps ON ps.playlist_id = p.id
@@ -129,8 +129,8 @@ async function getPlaylistById({ playlistId, userId = null }) {
        COUNT(DISTINCT ps.user_id)::int AS save_count,
        BOOL_OR(pl.user_id = $2) AS liked,
        BOOL_OR(ps.user_id = $2) AS saved
-     FROM playlists p
-     JOIN users u ON u.id = p.user_id
+      FROM playlists p
+      LEFT JOIN users u ON u.id = p.user_id
      LEFT JOIN playlist_likes pl ON pl.playlist_id = p.id
      LEFT JOIN playlist_saves ps ON ps.playlist_id = p.id
      WHERE p.id = $1
