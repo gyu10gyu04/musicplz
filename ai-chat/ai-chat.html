@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MusicPlz AI Critic Room</title>
+  <link rel="stylesheet" href="ai-chat.css">
+</head>
+<body>
+  <div class="noise-layer"></div>
+  <div class="shell-grid" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <a href="../main/main.html" class="brand" aria-label="MusicPlz 메인으로 이동">
+      <span class="brand-mark">MP</span>
+      <span>MusicPlz AI</span>
+    </a>
+    <nav class="top-actions" aria-label="페이지 이동">
+      <a href="../main/main.html">메인</a>
+      <a href="../create/create.html">플리 만들기</a>
+    </nav>
+  </header>
+
+  <main class="chat-shell">
+    <aside class="side-panel">
+      <div class="panel-card model-card">
+        <p class="eyebrow">Evaluation Engine</p>
+        <h1>Playlist<br>Critic Room</h1>
+        <p>곡 순서, 무드 커브, 비트 궁합을 기준으로 플리를 정밀하게 평가하는 AI 채팅방입니다.</p>
+      </div>
+
+      <div class="panel-card metric-card">
+        <div class="metric-head">
+          <span>Model Status</span>
+          <b>Standby</b>
+        </div>
+        <div class="metric-grid">
+          <div><strong>Flow</strong><span>0.92</span></div>
+          <div><strong>Beat</strong><span>0.88</span></div>
+          <div><strong>Mood</strong><span>0.95</span></div>
+        </div>
+      </div>
+    </aside>
+
+    <section class="chat-stage" aria-label="AI 플레이리스트 평가 채팅방">
+      <div class="chat-header">
+        <div>
+          <p class="eyebrow">Gemini Playlist Critic</p>
+          <h2>AI 평가 채팅방</h2>
+        </div>
+        <div class="status-pill"><span></span> Ready</div>
+      </div>
+
+      <div class="message-log">
+        <article class="message ai-message">
+          <div class="avatar">AI</div>
+          <div class="bubble">
+            <div class="message-meta">Gemini Critic</div>
+            <p>여기는 플리 평가 전용 채팅방입니다. 곧 플레이리스트 입력과 AI 평가 기능이 연결될 예정이에요.</p>
+          </div>
+        </article>
+
+        <article class="message user-message preview-message">
+          <div class="bubble">
+            <div class="message-meta">Preview Request</div>
+            <p>새벽 2시 R&amp;B 코스의 곡 순서와 분위기 흐름을 평가해줘.</p>
+          </div>
+          <div class="avatar">ME</div>
+        </article>
+
+        <article class="message ai-message wide-message">
+          <div class="avatar">AI</div>
+          <div class="bubble analysis-bubble">
+            <div class="message-meta">Evaluation Draft</div>
+            <div class="score-row">
+              <strong>96</strong>
+              <span>/100</span>
+              <em>Excellent Flow</em>
+            </div>
+            <div class="analysis-grid">
+              <div><b>곡 순서</b><span>잔잔한 인트로에서 밀도 높은 후반부로 자연스럽게 상승</span></div>
+              <div><b>무드 연결</b><span>새벽 감정선이 끊기지 않고 일정하게 유지</span></div>
+              <div><b>비트 궁합</b><span>저역대 리듬이 과하게 튀지 않아 청취 피로가 낮음</span></div>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <div class="composer-placeholder" aria-label="입력창 준비 중">
+        <div>
+          <strong>입력창 준비 중</strong>
+          <span>현재는 채팅방 인터페이스만 먼저 열려 있습니다.</span>
+        </div>
+        <button type="button" disabled>Coming Soon</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="ai-chat.js"></script>
+</body>
+</html>

@@ -19,11 +19,6 @@
   const featureItems = [...document.querySelectorAll('#featureGrid .feature-item')];
   const trendingCard = document.querySelector('.trending-card');
   const aiReviewCard = document.getElementById('aiReviewCard');
-  const aiReviewForm = document.getElementById('aiReviewForm');
-  const aiReviewTitle = document.getElementById('aiReviewTitle');
-  const aiReviewTracks = document.getElementById('aiReviewTracks');
-  const aiReviewSubmit = document.getElementById('aiReviewSubmit');
-  const aiReviewLog = document.getElementById('aiReviewLog');
 
   /* ─── 스크롤 상태 ─── */
   let sW       = window.innerWidth;
@@ -104,81 +99,8 @@
     });
   }
 
-  function appendAiMessage(kind, html) {
-    if (!aiReviewLog) return;
-    const item = document.createElement('div');
-    item.className = `ai-message ai-message-${kind}`;
-    item.innerHTML = html;
-    aiReviewLog.appendChild(item);
-    aiReviewLog.scrollTop = aiReviewLog.scrollHeight;
-  }
-
-  function renderReviewResult(review) {
-    const highlights = Array.isArray(review.highlights) ? review.highlights : [];
-    const fixes = Array.isArray(review.fixes) ? review.fixes : [];
-    const listHtml = items => items.length
-      ? `<ul>${items.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`
-      : '<p>특별히 짚을 항목은 없어요.</p>';
-
-    appendAiMessage('bot', `
-      <strong>Gemini 평론가</strong>
-      <div class="ai-review-result">
-        <div class="ai-score">${Number(review.score) || 0}<span>/100</span></div>
-        <p>${escapeHtml(review.verdict || '평가 완료.')}</p>
-        <div class="ai-result-block"><b>테이스팅 노트</b><p>${escapeHtml(review.tastingNote || '')}</p></div>
-        <div class="ai-result-block"><b>곡 순서와 흐름</b><p>${escapeHtml(review.flow || '')}</p></div>
-        <div class="ai-result-block"><b>비트 궁합</b><p>${escapeHtml(review.beatMatch || '')}</p></div>
-        <div class="ai-result-block"><b>좋았던 맛</b>${listHtml(highlights)}</div>
-        <div class="ai-result-block"><b>다음엔 더 맛있게</b>${listHtml(fixes)}</div>
-        ${review.closing ? `<div class="ai-result-block"><b>마무리</b><p>${escapeHtml(review.closing)}</p></div>` : ''}
-      </div>
-    `);
-  }
-
-  async function submitPlaylistReview(e) {
-    e.preventDefault();
-    if (!aiReviewTracks || !aiReviewSubmit) return;
-
-    const title = aiReviewTitle?.value.trim() || '';
-    const tracksText = aiReviewTracks.value.trim();
-    if (!tracksText) {
-      appendAiMessage('bot', '<strong>Gemini 평론가</strong><p>곡 목록이 비어있어. 한 줄에 한 곡씩 넣어줘야 제대로 씹어볼 수 있어.</p>');
-      aiReviewTracks.focus();
-      return;
-    }
-
-    appendAiMessage('user', `
-      <strong>나의 플리</strong>
-      <p>${escapeHtml(title || '제목 없는 플레이리스트')}<br>${escapeHtml(tracksText).replace(/\n/g, '<br>')}</p>
-    `);
-
-    const loadingId = `ai-loading-${Date.now()}`;
-    appendAiMessage('bot', `<strong>Gemini 평론가</strong><p id="${loadingId}">곡 사이를 씹고, 맛보고, 비트 결을 보는 중...</p>`);
-    aiReviewSubmit.disabled = true;
-    aiReviewSubmit.textContent = '평가 중';
-
-    try {
-      const res = await secureFetch('/api/music/playlist-review', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, tracksText }),
-      });
-      const data = await res.json().catch(() => ({}));
-      document.getElementById(loadingId)?.closest('.ai-message')?.remove();
-      if (!res.ok) throw new Error(data.error || '플레이리스트 평가에 실패했어요.');
-      renderReviewResult(data.review || {});
-    } catch (err) {
-      document.getElementById(loadingId)?.closest('.ai-message')?.remove();
-      appendAiMessage('bot', `<strong>Gemini 평론가</strong><p>${escapeHtml(err.message || '지금은 평가를 할 수 없어요.')}</p>`);
-    } finally {
-      aiReviewSubmit.disabled = false;
-      aiReviewSubmit.textContent = '평가 받기';
-    }
-  }
-
-  function initAiReviewChat() {
-    if (!aiReviewForm) return;
-    aiReviewForm.addEventListener('submit', submitPlaylistReview);
+  function initAiReviewCard() {
+    if (!aiReviewCard) return;
     aiReviewCard?.addEventListener('wheel', e => e.stopPropagation(), { passive: true });
     aiReviewCard?.addEventListener('touchstart', e => e.stopPropagation(), { passive: true });
     aiReviewCard?.addEventListener('touchmove', e => e.stopPropagation(), { passive: true });
@@ -543,7 +465,7 @@
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
   const waveEl   = document.getElementById('waveTransition');
   const wavePath = document.getElementById('wavePath');
-  const navTriggers = document.querySelectorAll('[data-nav="login"], [data-nav="signup"], [data-nav="create"]');
+  const navTriggers = document.querySelectorAll('[data-nav="login"], [data-nav="signup"], [data-nav="create"], [data-nav="ai-chat"]');
 
   /* 현재 웨이브가 화면을 덮고 있는 상태인지 추적.
      뒤로/앞으로가기로 인한 bfcache 복원 시 이 값을 보고
@@ -592,6 +514,8 @@
         url = '../login/login.html?mode=signup';
       } else if (el.dataset.nav === 'create') {
         url = '../create/create.html';
+      } else if (el.dataset.nav === 'ai-chat') {
+        url = '../ai-chat/ai-chat.html';
       } else {
         url = '../login/login.html';
       }
@@ -754,7 +678,7 @@
 
   /* ─── 초기화 ─── */
   initCardHover();
-  initAiReviewChat();
+  initAiReviewCard();
   loadFeaturedPlaylists();
   recalculate();
   requestAnimationFrame(tick);

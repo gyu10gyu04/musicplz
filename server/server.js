@@ -264,6 +264,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/main', express.static(path.join(__dirname, '..', 'main')));
 app.use('/login', express.static(path.join(__dirname, '..', 'login')));
 app.use('/create', express.static(path.join(__dirname, '..', 'create')));
+app.use('/ai-chat', express.static(path.join(__dirname, '..', 'ai-chat')));
 app.use('/playlist', express.static(path.join(__dirname, '..', 'playlist')));
 app.use('/playlist-share', express.static(path.join(__dirname, '..', 'playlist-share')));
 
