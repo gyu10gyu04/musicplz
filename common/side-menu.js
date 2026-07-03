@@ -30,7 +30,6 @@
           <span class="mp-side-avatar">MP</span>
           <div class="mp-side-user">
             <b>게스트</b>
-            <span>로그인하고 플리를 관리하세요</span>
           </div>
           <a class="mp-side-login" href="${routes.login}">로그인</a>
         </div>
@@ -38,14 +37,12 @@
     }
 
     const label = escapeHtml(user.displayName || user.email || 'MusicPlz User');
-    const sub = escapeHtml(user.email || '로그인됨');
     const initial = escapeHtml(initials(user.displayName || user.email));
     return `
       <div class="mp-side-auth">
         <span class="mp-side-avatar">${initial}</span>
         <div class="mp-side-user">
           <b>${label}</b>
-          <span>${sub}</span>
         </div>
       </div>
     `;
@@ -59,27 +56,20 @@
         <div class="mp-side-inner">
           <a class="mp-side-brand" href="${routes.home}">
             <span class="mp-side-logo">MP</span>
-            <span><strong>MusicPlz</strong><span>Quick Navigation</span></span>
+            <span><strong>MusicPlz</strong></span>
           </a>
           ${renderAuth(user)}
           <nav class="mp-side-nav" aria-label="주요 메뉴">
             <a class="mp-side-link" href="${routes.create}">
-              <span class="mp-side-icon">+</span>
-              <span><strong>만들기</strong><span>AI 검색으로 새 플리 구성</span></span>
-              <span class="mp-side-arrow">→</span>
+              <strong>만들기</strong>
             </a>
             <a class="mp-side-link" href="${routes.share}">
-              <span class="mp-side-icon">#</span>
-              <span><strong>플리공유</strong><span>사람들이 만든 플레이리스트 탐색</span></span>
-              <span class="mp-side-arrow">→</span>
+              <strong>플리공유</strong>
             </a>
             <a class="mp-side-link" href="${routes.ai}">
-              <span class="mp-side-icon">AI</span>
-              <span><strong>AI평가</strong><span>플리 평점과 평가 채팅방</span></span>
-              <span class="mp-side-arrow">→</span>
+              <strong>AI평가</strong>
             </a>
           </nav>
-          <div class="mp-side-foot"><span>Hover Left Edge</span><span class="mp-side-pulse"></span></div>
         </div>
       </aside>
     `;
