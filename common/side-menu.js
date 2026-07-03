@@ -3,7 +3,6 @@
 
   const routes = {
     home: '../main/main.html',
-    login: '../login/login.html',
     create: '../create/create.html',
     share: '../playlist-share/playlist-share.html',
     ai: '../ai-chat/ai-chat.html',
@@ -31,13 +30,12 @@
           <div class="mp-side-user">
             <b>게스트</b>
           </div>
-          <a class="mp-side-login" href="${routes.login}">로그인</a>
         </div>
       `;
     }
 
-    const label = escapeHtml(user.displayName || user.email || 'MusicPlz User');
-    const initial = escapeHtml(initials(user.displayName || user.email));
+    const label = escapeHtml(user.displayName || 'MusicPlz User');
+    const initial = escapeHtml(initials(user.displayName || label));
     return `
       <div class="mp-side-auth">
         <span class="mp-side-avatar">${initial}</span>
@@ -54,10 +52,6 @@
       <div class="mp-side-hotspot" id="mpSideHotspot" aria-hidden="true"></div>
       <aside class="mp-side-menu" id="mpSideMenu" aria-label="MusicPlz 빠른 메뉴">
         <div class="mp-side-inner">
-          <a class="mp-side-brand" href="${routes.home}">
-            <span class="mp-side-logo">MP</span>
-            <span><strong>MusicPlz</strong></span>
-          </a>
           ${renderAuth(user)}
           <nav class="mp-side-nav" aria-label="주요 메뉴">
             <a class="mp-side-link" href="${routes.create}">
