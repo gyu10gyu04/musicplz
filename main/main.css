@@ -423,36 +423,17 @@ h1{
   align-items:center;gap:52px;
 }
 .ai-review-copy{min-width:0;}
-.ai-review-points{display:flex;gap:9px;flex-wrap:wrap;margin-top:-1rem;}
-.ai-review-points span{
-  display:inline-flex;align-items:center;
-  padding:8px 13px;border:1px solid rgba(124,58,237,.16);
-  border-radius:999px;background:rgba(124,58,237,.06);
-  color:#6d28d9;font-size:.78rem;font-weight:800;
-}
 .ai-review-actions{margin-top:1.3rem;}
 .ai-rank-card{
   position:relative;overflow:hidden;
-  border:1px solid rgba(124,58,237,.14);
-  border-radius:28px;background:linear-gradient(145deg,rgba(255,255,255,.96),rgba(246,242,255,.9));
-  box-shadow:0 24px 70px rgba(42,24,84,.16), inset 0 1px 0 rgba(255,255,255,.9);
+  border:1px solid #e8e8e8;
+  border-radius:28px;background:#fff;
+  box-shadow:0 8px 40px rgba(0,0,0,.08),0 2px 8px rgba(0,0,0,.03);
   padding:20px;
-}
-.ai-rank-card::before{
-  content:'';position:absolute;right:-90px;top:-110px;width:260px;height:260px;
-  border-radius:50%;background:radial-gradient(circle,rgba(124,58,237,.18),rgba(124,58,237,0) 68%);
-  pointer-events:none;
-}
-.ai-rank-card::after{
-  content:'';position:absolute;inset:0;
-  background:linear-gradient(90deg,rgba(124,58,237,.06) 1px,transparent 1px),linear-gradient(0deg,rgba(124,58,237,.04) 1px,transparent 1px);
-  background-size:34px 34px;mask-image:linear-gradient(145deg,rgba(0,0,0,.55),transparent 70%);
-  pointer-events:none;
 }
 .ai-rank-head{position:relative;z-index:1;display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:16px;}
 .ai-chat-kicker{font-size:.68rem;font-weight:900;letter-spacing:1.8px;text-transform:uppercase;color:#7c3aed;margin-bottom:4px;}
 .ai-rank-head h2{font-size:1.25rem;letter-spacing:-.04em;line-height:1.15;}
-.ai-chat-badge{padding:7px 11px;border-radius:999px;background:#111;color:#fff;font-size:.72rem;font-weight:900;}
 .ai-rank-list{position:relative;z-index:1;display:grid;gap:10px;}
 .ai-rank-item{
   display:grid;grid-template-columns:40px minmax(0,1fr) 58px;gap:12px;align-items:center;
