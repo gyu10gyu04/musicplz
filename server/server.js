@@ -261,13 +261,20 @@ app.use('/api/admin', adminRoutes);
 /* ─── 정적 파일 서빙 ───
    프로젝트 폴더 구조(main/, login/, create/)를 그대로 서빙합니다.
    예: /main/main.html , /login/login.html , /create/create.html 등 */
-app.use('/main', express.static(path.join(__dirname, '..', 'main')));
-app.use('/login', express.static(path.join(__dirname, '..', 'login')));
-app.use('/create', express.static(path.join(__dirname, '..', 'create')));
-app.use('/ai-chat', express.static(path.join(__dirname, '..', 'ai-chat')));
-app.use('/common', express.static(path.join(__dirname, '..', 'common')));
-app.use('/playlist', express.static(path.join(__dirname, '..', 'playlist')));
-app.use('/playlist-share', express.static(path.join(__dirname, '..', 'playlist-share')));
+const staticOptions = {
+  etag: false,
+  lastModified: false,
+  setHeaders(res) {
+    res.setHeader('Cache-Control', 'no-store');
+  },
+};
+app.use('/main', express.static(path.join(__dirname, '..', 'main'), staticOptions));
+app.use('/login', express.static(path.join(__dirname, '..', 'login'), staticOptions));
+app.use('/create', express.static(path.join(__dirname, '..', 'create'), staticOptions));
+app.use('/ai-chat', express.static(path.join(__dirname, '..', 'ai-chat'), staticOptions));
+app.use('/common', express.static(path.join(__dirname, '..', 'common'), staticOptions));
+app.use('/playlist', express.static(path.join(__dirname, '..', 'playlist'), staticOptions));
+app.use('/playlist-share', express.static(path.join(__dirname, '..', 'playlist-share'), staticOptions));
 
 /* 루트 접속 시 홈으로 리다이렉트 */
 app.get('/', (req, res) => res.redirect('/main/main.html'));
