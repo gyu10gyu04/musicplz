@@ -40,7 +40,7 @@
     button.setAttribute('aria-label', '왼쪽 메뉴 열기');
     button.setAttribute('aria-expanded', 'false');
     button.setAttribute('aria-controls', 'mpSideMenu');
-    button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></svg><span>메뉴</span>';
+    button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect class="mp-toggle-panel" x="4" y="5" width="14" height="14" rx="3"/><path d="M8 9h6"/><path d="M8 12h6"/><path d="M8 15h4"/><path d="M20 8l-2 2 2 2"/></svg>';
     return button;
   }
 
@@ -67,8 +67,7 @@
     aside.innerHTML = `
       <div class="mp-side-menu__head">
         <button type="button" class="mp-side-menu__close" aria-label="왼쪽 메뉴 닫기">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></svg>
-          <span>메뉴</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect class="mp-toggle-panel" x="4" y="5" width="14" height="14" rx="3"/><path d="M8 9h6"/><path d="M8 12h6"/><path d="M8 15h4"/><path d="M20 8l-2 2 2 2"/></svg>
         </button>
       </div>
       <div class="mp-side-menu__nav">
