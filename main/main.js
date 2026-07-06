@@ -644,6 +644,9 @@
         if (item.dataset.action === 'library') {
           e.preventDefault();
           playWaveTransition(item.getAttribute('href'));
+        } else if (item.dataset.action === 'settings') {
+          e.preventDefault();
+          openSettingsModal();
         } else {
           e.preventDefault();
         }
@@ -658,6 +661,78 @@
       renderLoggedOut();
     });
   }
+
+  /* ─── 설정 모달 ─── */
+  const settingsModal = document.getElementById('settingsModal');
+  const settingsCloseBtn = document.getElementById('settingsCloseBtn');
+  const spotifyLinkBtn = document.getElementById('spotifyLinkBtn');
+  const appleLinkBtn = document.getElementById('appleLinkBtn');
+  const spotifyStatus = document.getElementById('spotifyStatus');
+  const appleStatus = document.getElementById('appleStatus');
+
+  function syncPlatformUI() {
+    const spotifyConnected = localStorage.getItem('musicplz_spotify_connected') === '1';
+    const appleConnected = localStorage.getItem('musicplz_apple_connected') === '1';
+
+    const spotifyCard = spotifyLinkBtn.closest('.platform-link-card');
+    const appleCard = appleLinkBtn.closest('.platform-link-card');
+
+    spotifyCard.classList.toggle('is-connected', spotifyConnected);
+    spotifyLinkBtn.classList.toggle('is-connected', spotifyConnected);
+    spotifyLinkBtn.textContent = spotifyConnected ? '연결 해제' : '연결하기';
+    spotifyStatus.textContent = spotifyConnected ? '연결됨 ✓' : '연결 안 됨';
+
+    appleCard.classList.toggle('is-connected', appleConnected);
+    appleLinkBtn.classList.toggle('is-connected', appleConnected);
+    appleLinkBtn.textContent = appleConnected ? '연결 해제' : '연결하기';
+    appleStatus.textContent = appleConnected ? '연결됨 ✓' : '연결 안 됨';
+  }
+
+  function openSettingsModal() {
+    syncPlatformUI();
+    settingsModal.hidden = false;
+    requestAnimationFrame(() => settingsModal.classList.add('is-open'));
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeSettingsModal() {
+    settingsModal.classList.remove('is-open');
+    settingsModal.addEventListener('transitionend', () => {
+      settingsModal.hidden = true;
+      document.body.style.overflow = '';
+    }, { once: true });
+  }
+
+  settingsCloseBtn.addEventListener('click', closeSettingsModal);
+  settingsModal.addEventListener('click', e => {
+    if (e.target === settingsModal) closeSettingsModal();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !settingsModal.hidden) closeSettingsModal();
+  });
+
+  spotifyLinkBtn.addEventListener('click', () => {
+    const connected = localStorage.getItem('musicplz_spotify_connected') === '1';
+    if (connected) {
+      localStorage.removeItem('musicplz_spotify_connected');
+    } else {
+      // TODO: 실제 OAuth 연동 시 window.location.href = '/api/auth/spotify' 로 교체
+      localStorage.setItem('musicplz_spotify_connected', '1');
+    }
+    syncPlatformUI();
+  });
+
+  appleLinkBtn.addEventListener('click', () => {
+    const connected = localStorage.getItem('musicplz_apple_connected') === '1';
+    if (connected) {
+      localStorage.removeItem('musicplz_apple_connected');
+    } else {
+      // TODO: 실제 MusicKit OAuth 연동 시 교체
+      localStorage.setItem('musicplz_apple_connected', '1');
+    }
+    syncPlatformUI();
+  });
+
 
   async function checkSession() {
     try {
