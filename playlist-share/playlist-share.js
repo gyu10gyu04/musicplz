@@ -184,31 +184,41 @@
 
   function attachCardPress(card, playlist) {
     let timer = null;
+    let stage2Timer = null;
     let startX = 0;
     let startY = 0;
     let longPressed = false;
+    let dragStarted = false;
 
     function clear() {
       window.clearTimeout(timer);
+      window.clearTimeout(stage2Timer);
       timer = null;
+      stage2Timer = null;
       card.classList.remove('is-pressing');
     }
 
     card.addEventListener('pointerdown', e => {
       if (e.button !== undefined && e.button !== 0) return;
       longPressed = false;
+      dragStarted = false;
       startX = e.clientX;
       startY = e.clientY;
       card.classList.add('is-pressing');
       timer = window.setTimeout(() => {
         longPressed = true;
-        clear();
         openQuickCard(playlist);
+        stage2Timer = window.setTimeout(() => {
+          dragStarted = true;
+          clear();
+          closeQuickCard();
+          setPointerPlaylist(playlist, startX, startY);
+        }, 760);
       }, 520);
     });
 
     card.addEventListener('pointermove', e => {
-      if (!timer) return;
+      if (!timer && !stage2Timer) return;
       if (Math.abs(e.clientX - startX) > 10 || Math.abs(e.clientY - startY) > 10) clear();
     });
 
@@ -556,8 +566,9 @@
   }
 
   function setPointerStackCreateHover(isHovering) {
-    pointerStackCreateHover = isHovering && pointerTracks.length > 0;
+    pointerStackCreateHover = isHovering && (pointerTracks.length > 0 || !!pointerPlaylist);
     if (pointerStackEl) pointerStackEl.classList.toggle('is-create-hover', pointerStackCreateHover);
+    if (pointerPlaylistEl) pointerPlaylistEl.classList.toggle('is-create-hover', pointerStackCreateHover);
   }
 
   function syncNavVisibility() {
@@ -868,6 +879,13 @@
   });
   navCreate.addEventListener('pointerenter', () => setPointerStackCreateHover(true));
   navCreate.addEventListener('pointerleave', () => setPointerStackCreateHover(false));
+
+  document.addEventListener('pointerover', e => {
+    if (e.target.closest('a[href$="ai-chat.html"]')) setPointerStackCreateHover(true);
+  });
+  document.addEventListener('pointerout', e => {
+    if (e.target.closest('a[href$="ai-chat.html"]')) setPointerStackCreateHover(false);
+  });
 
   document.querySelector('.logo').addEventListener('click', e => {
     e.preventDefault();
