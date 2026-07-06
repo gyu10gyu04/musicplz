@@ -200,6 +200,7 @@
 
     card.addEventListener('pointerdown', e => {
       if (e.button !== undefined && e.button !== 0) return;
+      if (typeof pointerTracks !== 'undefined' && pointerTracks.length > 0) return;
       longPressed = false;
       dragStarted = false;
       startX = e.clientX;
@@ -285,6 +286,7 @@
 
     quickCard.addEventListener('pointerdown', e => {
       if (e.button !== undefined && e.button !== 0) return;
+      if (typeof pointerTracks !== 'undefined' && pointerTracks.length > 0) return;
       if (e.target.closest('button,a,input,textarea,select')) return;
       if (!quickPlaylist) return;
       startX = e.clientX;
@@ -525,7 +527,7 @@
   }
 
   async function setPointerPlaylist(playlist, x = pointerPlaylistX, y = pointerPlaylistY) {
-    clearPointerTracks();
+    if (pointerTracks.length > 0) return;
     positionPointerPlaylist(x, y);
     try {
       pointerPlaylist = normalizePlaylistForPointer(await fetchDetail(playlist.id));
@@ -547,6 +549,7 @@
   }
 
   function addPointerTrack(track, fallbackCoverUrl = '') {
+    if (pointerPlaylist) return;
     const nextTrack = normalizedPointerTrack(track, fallbackCoverUrl);
     if (!nextTrack.id || !nextTrack.title || !nextTrack.artist) return;
     if (pointerTracks.some(existing => existing.id === nextTrack.id)) return;
@@ -675,6 +678,7 @@
 
     item.addEventListener('pointerdown', e => {
       if (e.button !== undefined && e.button !== 0) return;
+      if (typeof pointerPlaylist !== 'undefined' && pointerPlaylist) return;
       start(e.clientX, e.clientY);
     });
     item.addEventListener('pointermove', e => move(e.clientX, e.clientY));
