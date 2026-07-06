@@ -534,6 +534,7 @@
   const selectedIds   = new Set();
   const selectedOrder = []; // 담은 순서를 유지 (트레이 표시용)
   const POINTER_STACK_KEY = 'mp-share-pointer-tracks';
+  const POINTER_PLAYLIST_KEY = 'mp-share-pointer-playlist';
 
   const tray         = document.getElementById('tray');
   const trayCount    = document.getElementById('trayCount');
@@ -558,13 +559,27 @@
 
   function importPointerStackTracks() {
     let imported = [];
+    let importedPlaylist = null;
     try {
-      const parsed = JSON.parse(sessionStorage.getItem(POINTER_STACK_KEY) || '[]');
-      imported = Array.isArray(parsed) ? parsed.map(normalizeImportedTrack) : [];
+      const playlist = JSON.parse(sessionStorage.getItem(POINTER_PLAYLIST_KEY) || 'null');
+      if (playlist && Array.isArray(playlist.tracks)) {
+        importedPlaylist = playlist;
+        imported = playlist.tracks.map(normalizeImportedTrack);
+      }
+    } catch {
+      importedPlaylist = null;
+    }
+
+    try {
+      if (!importedPlaylist) {
+        const parsed = JSON.parse(sessionStorage.getItem(POINTER_STACK_KEY) || '[]');
+        imported = Array.isArray(parsed) ? parsed.map(normalizeImportedTrack) : [];
+      }
     } catch {
       imported = [];
     }
     sessionStorage.removeItem(POINTER_STACK_KEY);
+    sessionStorage.removeItem(POINTER_PLAYLIST_KEY);
 
     imported.forEach(track => {
       if (!track.id || !track.title || !track.artist || selectedIds.has(track.id)) return;
@@ -573,7 +588,14 @@
       selectedOrder.push(track.id);
     });
 
-    if (selectedOrder.length > 0) renderTray();
+    if (selectedOrder.length > 0) {
+      renderTray();
+      if (importedPlaylist) {
+        playlistTitleInput.value = `${importedPlaylist.title || '선택한 플리'} 기반 플리`;
+        if (importedPlaylist.coverUrl) setPlaylistCover(importedPlaylist.coverUrl);
+        openPlaylistComposer();
+      }
+    }
   }
 
   function toggleTrack(track) {

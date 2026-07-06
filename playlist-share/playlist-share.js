@@ -13,6 +13,7 @@
   const likeBtn = document.getElementById('likeBtn');
   const saveBtn = document.getElementById('saveBtn');
   const quickCardBackdrop = document.getElementById('quickCardBackdrop');
+  const quickCard = document.getElementById('quickCard');
   const quickCardClose = document.getElementById('quickCardClose');
   const quickCover = document.getElementById('quickCover');
   const quickTitle = document.getElementById('quickTitle');
@@ -30,6 +31,7 @@
   const nav = document.querySelector('nav');
   const navCreate = document.querySelector('.nav-create');
   const POINTER_STACK_KEY = 'mp-share-pointer-tracks';
+  const POINTER_PLAYLIST_KEY = 'mp-share-pointer-playlist';
 
   let sort = 'latest';
   let currentPlaylist = null;
@@ -43,6 +45,11 @@
   let pointerStackRaf = null;
   let pointerStackExpanded = false;
   let pointerStackCreateHover = false;
+  let pointerPlaylistEl = null;
+  let pointerPlaylistX = window.innerWidth / 2;
+  let pointerPlaylistY = window.innerHeight / 2;
+  let pointerPlaylistRaf = null;
+  let pointerPlaylist = null;
   let emptySpacePress = null;
   let lastScrollY = window.scrollY;
   let navScrollDelta = 0;
@@ -255,6 +262,39 @@
     requestAnimationFrame(() => quickCardBackdrop.classList.add('is-open'));
   }
 
+  function attachQuickPlaylistPickup() {
+    let timer = null;
+    let startX = 0;
+    let startY = 0;
+
+    function clear() {
+      window.clearTimeout(timer);
+      timer = null;
+      quickCardBackdrop.classList.remove('is-picking-playlist');
+    }
+
+    quickCard.addEventListener('pointerdown', e => {
+      if (e.button !== undefined && e.button !== 0) return;
+      if (e.target.closest('button,a,input,textarea,select')) return;
+      if (!quickPlaylist) return;
+      startX = e.clientX;
+      startY = e.clientY;
+      quickCardBackdrop.classList.add('is-picking-playlist');
+      timer = window.setTimeout(() => {
+        const picked = quickPlaylist;
+        clear();
+        setPointerPlaylist(picked, e.clientX, e.clientY);
+      }, 760);
+    });
+    quickCard.addEventListener('pointermove', e => {
+      if (!timer) return;
+      if (Math.abs(e.clientX - startX) > 12 || Math.abs(e.clientY - startY) > 12) clear();
+    });
+    quickCard.addEventListener('pointerup', clear);
+    quickCard.addEventListener('pointercancel', clear);
+    quickCard.addEventListener('contextmenu', e => e.preventDefault());
+  }
+
   function closeQuickCard() {
     quickCardBackdrop.classList.remove('is-open');
     setTimeout(() => {
@@ -418,6 +458,82 @@
         });
       });
     }
+  }
+
+  function normalizePlaylistForPointer(playlist) {
+    const tracks = Array.isArray(playlist?.tracks) ? playlist.tracks.map(track => normalizedPointerTrack(track, playlist.coverUrl)).filter(track => track.id && track.title && track.artist) : [];
+    return {
+      id: String(playlist?.id || '').trim(),
+      title: String(playlist?.title || '선택한 플리').trim(),
+      coverUrl: String(playlist?.coverUrl || '').trim(),
+      displayName: String(playlist?.displayName || 'MusicPlz').trim(),
+      trackCount: Number(playlist?.trackCount || tracks.length) || tracks.length,
+      likeCount: Number(playlist?.likeCount) || 0,
+      saveCount: Number(playlist?.saveCount) || 0,
+      tracks,
+    };
+  }
+
+  function persistPointerPlaylist() {
+    if (!pointerPlaylist) return;
+    sessionStorage.setItem(POINTER_PLAYLIST_KEY, JSON.stringify(pointerPlaylist));
+  }
+
+  function ensurePointerPlaylistEl() {
+    if (pointerPlaylistEl) return pointerPlaylistEl;
+    pointerPlaylistEl = document.createElement('div');
+    pointerPlaylistEl.className = 'pointer-playlist-card';
+    pointerPlaylistEl.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(pointerPlaylistEl);
+    return pointerPlaylistEl;
+  }
+
+  function applyPointerPlaylistPosition() {
+    pointerPlaylistRaf = null;
+    if (!pointerPlaylistEl) return;
+    pointerPlaylistEl.style.transform = `translate3d(${pointerPlaylistX + 14}px, ${pointerPlaylistY + 14}px, 0)`;
+  }
+
+  function positionPointerPlaylist(x = pointerPlaylistX, y = pointerPlaylistY) {
+    pointerPlaylistX = x;
+    pointerPlaylistY = y;
+    if (!pointerPlaylistEl || pointerPlaylistRaf) return;
+    pointerPlaylistRaf = requestAnimationFrame(applyPointerPlaylistPosition);
+  }
+
+  function renderPointerPlaylist() {
+    if (!pointerPlaylist) {
+      if (pointerPlaylistEl) pointerPlaylistEl.remove();
+      pointerPlaylistEl = null;
+      sessionStorage.removeItem(POINTER_PLAYLIST_KEY);
+      return;
+    }
+    const el = ensurePointerPlaylistEl();
+    el.innerHTML = `<img src="${escapeHtml(pointerPlaylist.coverUrl)}" alt="" draggable="false">`;
+    positionPointerPlaylist();
+    persistPointerPlaylist();
+  }
+
+  async function setPointerPlaylist(playlist, x = pointerPlaylistX, y = pointerPlaylistY) {
+    clearPointerTracks();
+    positionPointerPlaylist(x, y);
+    try {
+      pointerPlaylist = normalizePlaylistForPointer(await fetchDetail(playlist.id));
+    } catch (_) {
+      pointerPlaylist = normalizePlaylistForPointer(playlist);
+    }
+    renderPointerPlaylist();
+  }
+
+  function clearPointerPlaylist() {
+    pointerPlaylist = null;
+    renderPointerPlaylist();
+  }
+
+  function persistPointerPlaylistTracksForCreate() {
+    if (!pointerPlaylist) return;
+    persistPointerPlaylist();
+    sessionStorage.setItem(POINTER_STACK_KEY, JSON.stringify(pointerPlaylist.tracks || []));
   }
 
   function addPointerTrack(track, fallbackCoverUrl = '') {
@@ -745,7 +861,8 @@
   }
   navCreate.addEventListener('click', e => {
     e.preventDefault();
-    if (pointerTracks.length > 0) persistPointerTracksForCreate();
+    if (pointerPlaylist) persistPointerPlaylistTracksForCreate();
+    else if (pointerTracks.length > 0) persistPointerTracksForCreate();
     else sessionStorage.removeItem(POINTER_STACK_KEY);
     playWaveTransition(navCreate.getAttribute('href'));
   });
@@ -755,10 +872,23 @@
   document.querySelector('.logo').addEventListener('click', e => {
     e.preventDefault();
     sessionStorage.removeItem(POINTER_STACK_KEY);
+    sessionStorage.removeItem(POINTER_PLAYLIST_KEY);
     playWaveTransition(e.currentTarget.getAttribute('href'));
   });
 
+  document.addEventListener('click', e => {
+    const aiLink = e.target.closest('a[href$="/ai-chat/ai-chat.html"],a[href$="ai-chat/ai-chat.html"]');
+    if (!aiLink || !pointerPlaylist) return;
+    e.preventDefault();
+    persistPointerPlaylist();
+    playWaveTransition(aiLink.getAttribute('href'));
+  });
+
   window.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && pointerPlaylist) {
+      clearPointerPlaylist();
+      return;
+    }
     if (e.key === 'Escape' && pointerTracks.length > 0) {
       clearPointerTracks();
       return;
@@ -766,7 +896,10 @@
     if (e.key === 'Escape' && !playlistDetail.hidden) showList();
   });
 
-  window.addEventListener('pointermove', e => positionPointerStack(e.clientX, e.clientY), { passive: true });
+  window.addEventListener('pointermove', e => {
+    positionPointerStack(e.clientX, e.clientY);
+    positionPointerPlaylist(e.clientX, e.clientY);
+  }, { passive: true });
   window.addEventListener('scroll', scheduleNavVisibility, { passive: true });
   window.addEventListener('pointerdown', startEmptySpacePress);
   window.addEventListener('pointermove', moveEmptySpacePress, { passive: true });
@@ -791,6 +924,7 @@
 
   const id = new URLSearchParams(location.search).get('id');
   sessionStorage.removeItem(POINTER_STACK_KEY);
+  attachQuickPlaylistPickup();
   loadList();
   if (id) showDetail(id);
 })();
