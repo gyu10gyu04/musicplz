@@ -1,4 +1,4 @@
-# MusicPlz 서버
+# MusicPlz
 
 이메일/비밀번호 로그인 시스템 + **AI 음악 검색** (Spotify + Gemini 연동) 기능을 제공합니다.
 
